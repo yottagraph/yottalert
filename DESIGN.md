@@ -4,7 +4,7 @@
 
 Build a web application called Yottalert. Tagline: "Context-aware alerts from the YottaGraph." Use Nuxt 3 + Vue 3 + Vuetify 3 + TypeScript in SPA mode. No mock data — use Elemental's MCP server and Elemental APIs for entities, events, relationships, geographies, sources, and provenance.
 
-Implement the three-pane shell (app.vue + AppHeader.vue + YottalertShell.vue) following the Wealth Atlas blueprint: pinned header, persistent 184px dark sidebar (sidebar background hard-coded as --lv-sidebar-bg, does not theme), and a single scrollable main panel. Apply the --dynamic-* token system via useLovelaceTheme() with five presets (lovelace-dark, lovelace-light, paper, bloomberg, slate). Hide body scrolling; scroll lives inside YottalertShell.
+Implement the three-pane shell (app.vue + AppHeader.vue + YottalertShell.vue) following the Wealth Atlas blueprint: pinned header, persistent 184px dark sidebar (sidebar background hard-coded as --lv-sidebar-bg, does not theme), and a single scrollable main panel. Apply the --dynamic-\* token system via useLovelaceTheme() with five presets (lovelace-dark, lovelace-light, paper, bloomberg, slate). Hide body scrolling; scroll lives inside YottalertShell.
 
 Create services: elementalMcpClient.ts, elementalApiClient.ts, watchRuleInterpreter.ts, changeDetectionService.ts, alertScoringService.ts, alertExplanationService.ts, provenanceService.ts, syncScheduler.ts, digestService.ts. The MCP client must expose stable Yottalert function names even if Elemental tool names change. Never invoke MCP from the browser.
 
@@ -26,59 +26,59 @@ Product tagline: Context-aware alerts from the YottaGraph.
 Version 1.0 · Owner: Lovelace · Status: Draft synthesized from PRD-Yottalert.txr, 2026-05-20_ui_prd.md, AGENT_PIPELINE_UX_PRD.md, design-tokens.md, ui-architecture.md
 
 1. Product Overview
-Yottalert is a local-context alerting application built on Elemental and the YottaGraph. Users create alerts around geographies, entities, events, and relationships, then Yottalert uses Elemental's MCP tools and APIs to retrieve live graph context, detect meaningful change, score candidate alerts, and present them in a simple, executive-readable interface with explainable evidence and provenance.
+   Yottalert is a local-context alerting application built on Elemental and the YottaGraph. Users create alerts around geographies, entities, events, and relationships, then Yottalert uses Elemental's MCP tools and APIs to retrieve live graph context, detect meaningful change, score candidate alerts, and present them in a simple, executive-readable interface with explainable evidence and provenance.
 
 Mental model: Google Alerts (create a watch, get notified) — but the data source is Elemental's context graph rather than a search index. Every alert is grounded in entities, events, relationships, sources, and provenance, with editable structured criteria derived from a natural-language prompt.
 
 Architectural rule: Elemental is the system of record for graph data. Yottalert is the monitoring, alerting, explanation, and workflow layer. Yottalert never duplicates Elemental's graph; it stores Elemental object IDs and Yottalert-specific state only.
 
 2. Goals and Non-Goals
-2.1 Goals
-Let users create alert rules in natural language and have Elemental resolve them into structured monitoring criteria.
-Periodically query Elemental for new/changed entities, events, and relationships matching each rule.
-Score candidate alerts and surface only those above the user's sensitivity threshold.
-Present every alert with entities, events, relationships, source evidence, and confidence — inspectable without leaving the app.
-Provide a consistent three-pane shell (top app bar, persistent dark left nav, scrollable main panel) consistent with the Wealth Atlas blueprint so Yottalert feels like the rest of the Lovelace tenant suite.
-Use the chat-first agent surface with live workflow steps + typewriter streaming for the watch-rule interpreter, "check now" flow, and explanation generation.
-Use the Gemini-narrated brief pattern for daily/weekly digests so digests are cited markdown over deterministic data context — never invented numbers.
-2.2 Non-Goals (v1)
-A bespoke graph database (Elemental is the source of truth).
-A general workflow/case-management tool (only alert lifecycle and feedback).
-A mobile-native app (responsive web only; iOS-specific fixes inherited from the Wealth Atlas blueprint).
-Direct MCP invocation from the browser (always backend-mediated).
-A universal agent orchestration framework — Yottalert ships a thin pipeline, not a runtime.
+   2.1 Goals
+   Let users create alert rules in natural language and have Elemental resolve them into structured monitoring criteria.
+   Periodically query Elemental for new/changed entities, events, and relationships matching each rule.
+   Score candidate alerts and surface only those above the user's sensitivity threshold.
+   Present every alert with entities, events, relationships, source evidence, and confidence — inspectable without leaving the app.
+   Provide a consistent three-pane shell (top app bar, persistent dark left nav, scrollable main panel) consistent with the Wealth Atlas blueprint so Yottalert feels like the rest of the Lovelace tenant suite.
+   Use the chat-first agent surface with live workflow steps + typewriter streaming for the watch-rule interpreter, "check now" flow, and explanation generation.
+   Use the Gemini-narrated brief pattern for daily/weekly digests so digests are cited markdown over deterministic data context — never invented numbers.
+   2.2 Non-Goals (v1)
+   A bespoke graph database (Elemental is the source of truth).
+   A general workflow/case-management tool (only alert lifecycle and feedback).
+   A mobile-native app (responsive web only; iOS-specific fixes inherited from the Wealth Atlas blueprint).
+   Direct MCP invocation from the browser (always backend-mediated).
+   A universal agent orchestration framework — Yottalert ships a thin pipeline, not a runtime.
 3. Target Users
-Persona	Primary monitoring concern
-FSI analyst
-Local economic, real-estate, corporate, and regulatory signals around branch markets
-Enterprise risk
-Facilities, suppliers, customers, geographies
-Real estate / infra investor
-Properties, zoning, permits, litigation, municipal activity
-Public affairs
-Local government, public meetings, policy shifts, community issues
-Elemental power user
-Lightweight alerting layer atop graph context
+   Persona Primary monitoring concern
+   FSI analyst
+   Local economic, real-estate, corporate, and regulatory signals around branch markets
+   Enterprise risk
+   Facilities, suppliers, customers, geographies
+   Real estate / infra investor
+   Properties, zoning, permits, litigation, municipal activity
+   Public affairs
+   Local government, public meetings, policy shifts, community issues
+   Elemental power user
+   Lightweight alerting layer atop graph context
 4. Primary Use Cases
-ID	Use case	Example
-UC-1
-Local context monitoring
-"Alert me when new events, entities, or relationships appear in Downtown Pittsburgh related to commercial real estate stress."
-UC-2
-Entity monitoring
-"Alert me when BNY Mellon appears in new local events, new relationships, or new documents connected to Pittsburgh."
-UC-3
-Relationship monitoring
-"Alert me when a monitored company becomes connected to a zoning hearing, lawsuit, permit filing, public meeting, infrastructure disruption, or adverse local news item."
-UC-4
-Event-type monitoring
-"Alert me when Elemental detects new business closures, permit changes, public hearings, lawsuits, infrastructure disruptions, or public-safety events in Allegheny County."
-UC-5
-Portfolio monitoring
-"Monitor these 200 branch locations and alert me when a local event may affect operations, reputation, demand, or regulatory exposure."
+   ID Use case Example
+   UC-1
+   Local context monitoring
+   "Alert me when new events, entities, or relationships appear in Downtown Pittsburgh related to commercial real estate stress."
+   UC-2
+   Entity monitoring
+   "Alert me when BNY Mellon appears in new local events, new relationships, or new documents connected to Pittsburgh."
+   UC-3
+   Relationship monitoring
+   "Alert me when a monitored company becomes connected to a zoning hearing, lawsuit, permit filing, public meeting, infrastructure disruption, or adverse local news item."
+   UC-4
+   Event-type monitoring
+   "Alert me when Elemental detects new business closures, permit changes, public hearings, lawsuits, infrastructure disruptions, or public-safety events in Allegheny County."
+   UC-5
+   Portfolio monitoring
+   "Monitor these 200 branch locations and alert me when a local event may affect operations, reputation, demand, or regulatory exposure."
 5. Functional Requirements
-5.1 Elemental Integration
-Yottalert must use Elemental as the source of truth via three channels:
+   5.1 Elemental Integration
+   Yottalert must use Elemental as the source of truth via three channels:
 
 Elemental MCP server — tool-based access to graph queries, entity/event/relationship lookup, source retrieval, provenance.
 Elemental API — structured REST/GraphQL calls for deterministic application workflows.
@@ -123,22 +123,22 @@ When the user submits natural language, the backend calls resolveUserWatchQuery(
 Input: "Monitor Downtown Pittsburgh for commercial real estate stress."
 
 {
-  "watchTargetType": "geography",
-  "geography": { "name": "Downtown Pittsburgh", "type": "neighborhood" },
-  "eventCategories": [
-    "business_closure", "commercial_permit", "zoning_hearing",
-    "foreclosure", "tax_lien", "lawsuit", "vacancy_signal", "local_news"
-  ],
-  "entityTypes": [
-    "property", "business", "developer",
-    "government_body", "financial_institution"
-  ],
-  "relationshipTypes": [
-    "located_in", "owns", "leases", "filed",
-    "subject_of", "appears_in", "adjacent_to"
-  ],
-  "timeWindow": "last_30_days",
-  "minimumConfidence": 0.7
+"watchTargetType": "geography",
+"geography": { "name": "Downtown Pittsburgh", "type": "neighborhood" },
+"eventCategories": [
+"business_closure", "commercial_permit", "zoning_hearing",
+"foreclosure", "tax_lien", "lawsuit", "vacancy_signal", "local_news"
+],
+"entityTypes": [
+"property", "business", "developer",
+"government_body", "financial_institution"
+],
+"relationshipTypes": [
+"located_in", "owns", "leases", "filed",
+"subject_of", "appears_in", "adjacent_to"
+],
+"timeWindow": "last_30_days",
+"minimumConfidence": 0.7
 }
 The structured interpretation is always editable before save.
 
@@ -165,8 +165,8 @@ lastSeenEventIds
 lastAlertedAt
 5.7 Alert Scoring
 Alert Score = Relevance × Novelty × Local Significance
-            × Entity Importance × Confidence × Urgency
-Severity band	Score
+× Entity Importance × Confidence × Urgency
+Severity band Score
 High
 80–100
 Medium
@@ -179,87 +179,87 @@ Each component is computed from Elemental data where possible (centrality, sourc
 
 5.8 Alert Object
 type YottalertAlert = {
-  id: string;
-  alertRuleId: string;
-  elementalObjectIds: string[];
-  elementalEntityIds: string[];
-  elementalEventIds: string[];
-  elementalRelationshipIds: string[];
-  title: string;
-  summary: string;
-  whyItMatters: string;
-  whatChanged: string;
-  suggestedNextStep: string;
-  geographyLabel?: string;
-  severity: "high" | "medium" | "low" | "suppressed";
-  score: number;
-  scoreBreakdown: {
-    relevance: number; novelty: number; localSignificance: number;
-    entityImportance: number; confidence: number; urgency: number;
-  };
-  confidence: number;
-  createdAt: string;
-  sourceCount: number;
-  provenanceStatus: "complete" | "partial" | "unavailable";
-  status: "new" | "read" | "archived" | "suppressed";
+id: string;
+alertRuleId: string;
+elementalObjectIds: string[];
+elementalEntityIds: string[];
+elementalEventIds: string[];
+elementalRelationshipIds: string[];
+title: string;
+summary: string;
+whyItMatters: string;
+whatChanged: string;
+suggestedNextStep: string;
+geographyLabel?: string;
+severity: "high" | "medium" | "low" | "suppressed";
+score: number;
+scoreBreakdown: {
+relevance: number; novelty: number; localSignificance: number;
+entityImportance: number; confidence: number; urgency: number;
+};
+confidence: number;
+createdAt: string;
+sourceCount: number;
+provenanceStatus: "complete" | "partial" | "unavailable";
+status: "new" | "read" | "archived" | "suppressed";
 };
 5.9 Provenance Requirements
 Every alert must show: source document/item, source URL or identifier, ingestion timestamp, published timestamp (if known), extracted claim or event, entity-resolution confidence, relationship confidence, event-extraction confidence, geography-resolution confidence, and Elemental object IDs.
 
 6. Data Model (Yottalert Local DB)
-Table	Key fields
-users
-id, email, name, organization_id, created_at
-organizations
-id, name, created_at
-elemental_connections
-id, organization_id, connection_name, mcp_server_url, api_base_url, auth_type, encrypted_credentials_ref, status, last_checked_at, created_at
-alert_rules
-id, organization_id, user_id, name, natural_language_prompt, structured_rule_json, watch_target_type, frequency, minimum_confidence, sensitivity, delivery_destination, enabled, last_checked_at, last_elemental_cursor, created_at, updated_at
-alerts
-id, organization_id, alert_rule_id, title, summary, why_it_matters, what_changed, suggested_next_step, severity, score, score_breakdown_json, confidence, elemental_object_refs_json, source_count, provenance_status, status, created_at
-alert_evidence_refs
-id, alert_id, elemental_source_id, elemental_object_id, evidence_type, display_text, confidence, created_at
-alert_feedback
-id, alert_id, user_id, feedback_type, comment, created_at
-sync_runs
-id, organization_id, alert_rule_id, status, started_at, completed_at, objects_checked, candidate_alerts_created, errors_json
+   Table Key fields
+   users
+   id, email, name, organization_id, created_at
+   organizations
+   id, name, created_at
+   elemental_connections
+   id, organization_id, connection_name, mcp_server_url, api_base_url, auth_type, encrypted_credentials_ref, status, last_checked_at, created_at
+   alert_rules
+   id, organization_id, user_id, name, natural_language_prompt, structured_rule_json, watch_target_type, frequency, minimum_confidence, sensitivity, delivery_destination, enabled, last_checked_at, last_elemental_cursor, created_at, updated_at
+   alerts
+   id, organization_id, alert_rule_id, title, summary, why_it_matters, what_changed, suggested_next_step, severity, score, score_breakdown_json, confidence, elemental_object_refs_json, source_count, provenance_status, status, created_at
+   alert_evidence_refs
+   id, alert_id, elemental_source_id, elemental_object_id, evidence_type, display_text, confidence, created_at
+   alert_feedback
+   id, alert_id, user_id, feedback_type, comment, created_at
+   sync_runs
+   id, organization_id, alert_rule_id, status, started_at, completed_at, objects_checked, candidate_alerts_created, errors_json
 7. Backend Services
-/services/elementalMcpClient.ts        // MCP wrapper, stable function surface
-/services/elementalApiClient.ts        // Typed API client
-/services/watchRuleInterpreter.ts      // NL → structured rule via Elemental
-/services/changeDetectionService.ts    // Per-rule sync diff
-/services/alertScoringService.ts       // 6-factor score
-/services/alertExplanationService.ts   // Composes title/summary/whyItMatters/whatChanged/nextStep
-/services/provenanceService.ts         // Source + confidence rollup
-/services/syncScheduler.ts             // Cron / queue runner
-/services/digestService.ts             // Daily/weekly Gemini-narrated digest
+   /services/elementalMcpClient.ts // MCP wrapper, stable function surface
+   /services/elementalApiClient.ts // Typed API client
+   /services/watchRuleInterpreter.ts // NL → structured rule via Elemental
+   /services/changeDetectionService.ts // Per-rule sync diff
+   /services/alertScoringService.ts // 6-factor score
+   /services/alertExplanationService.ts // Composes title/summary/whyItMatters/whatChanged/nextStep
+   /services/provenanceService.ts // Source + confidence rollup
+   /services/syncScheduler.ts // Cron / queue runner
+   /services/digestService.ts // Daily/weekly Gemini-narrated digest
 8. API Routes
-GET    /api/health
-GET    /api/elemental/status
-POST   /api/elemental/test-connection
-GET    /api/alert-rules
-POST   /api/alert-rules
-GET    /api/alert-rules/:id
-PATCH  /api/alert-rules/:id
-DELETE /api/alert-rules/:id
-POST   /api/alert-rules/interpret
-POST   /api/alert-rules/:id/check-now
-GET    /api/alerts
-GET    /api/alerts/:id
-PATCH  /api/alerts/:id/status
-POST   /api/alerts/:id/feedback
-GET    /api/entities/:elementalEntityId
-GET    /api/events/:elementalEventId
-GET    /api/relationships/:elementalRelationshipId
-GET    /api/geographies/context
-GET    /api/digest/daily
-POST   /api/sync/run
+   GET /api/health
+   GET /api/elemental/status
+   POST /api/elemental/test-connection
+   GET /api/alert-rules
+   POST /api/alert-rules
+   GET /api/alert-rules/:id
+   PATCH /api/alert-rules/:id
+   DELETE /api/alert-rules/:id
+   POST /api/alert-rules/interpret
+   POST /api/alert-rules/:id/check-now
+   GET /api/alerts
+   GET /api/alerts/:id
+   PATCH /api/alerts/:id/status
+   POST /api/alerts/:id/feedback
+   GET /api/entities/:elementalEntityId
+   GET /api/events/:elementalEventId
+   GET /api/relationships/:elementalRelationshipId
+   GET /api/geographies/context
+   GET /api/digest/daily
+   POST /api/sync/run
 9. UI Specification
-Stack note: The canonical implementation follows the Wealth Atlas blueprint (2026-05-20_ui_prd.md): Nuxt 3 + Vue 3 + Vuetify 3 + TypeScript, SPA mode, file-based routing under pages/, file-based API under server/api/. The palette/typography rules from design-tokens.md (HSL CSS custom properties, Space Grotesk + JetBrains Mono, sidebar-always-dark) are adopted but expressed as the Wealth Atlas --dynamic-* / --lv-sidebar-* token names. The page primitives from ui-architecture.md (PageHeader / SectionCard / FilterBar) are reused as Vue equivalents.
+   Stack note: The canonical implementation follows the Wealth Atlas blueprint (2026-05-20_ui_prd.md): Nuxt 3 + Vue 3 + Vuetify 3 + TypeScript, SPA mode, file-based routing under pages/, file-based API under server/api/. The palette/typography rules from design-tokens.md (HSL CSS custom properties, Space Grotesk + JetBrains Mono, sidebar-always-dark) are adopted but expressed as the Wealth Atlas --dynamic-_ / --lv-sidebar-_ token names. The page primitives from ui-architecture.md (PageHeader / SectionCard / FilterBar) are reused as Vue equivalents.
 
 9.1 Stack and conventions
-Layer	Choice
+Layer Choice
 Framework
 Nuxt 3, SPA (ssr: false)
 UI kit
@@ -277,14 +277,14 @@ Gemini 2.5 Flash, server-composed with deterministic fallback
 Vuetify defaults set once in nuxt.config.ts:
 
 defaults: {
-  VBtn:       { variant: 'flat', rounded: 'lg' },
-  VCard:      { rounded: 'lg', variant: 'outlined' },
-  VTextField: { variant: 'outlined', density: 'comfortable', color: 'primary' },
-  VSelect:    { variant: 'outlined', density: 'comfortable', color: 'primary' },
-  VChip:      { size: 'small', variant: 'tonal' },
-  VDialog:    { VCard: { variant: 'flat' } },
-  VTooltip:   { contentClass: 'lv-tooltip' },
-  VMenu:      { contentClass: 'lv-menu' },
+VBtn: { variant: 'flat', rounded: 'lg' },
+VCard: { rounded: 'lg', variant: 'outlined' },
+VTextField: { variant: 'outlined', density: 'comfortable', color: 'primary' },
+VSelect: { variant: 'outlined', density: 'comfortable', color: 'primary' },
+VChip: { size: 'small', variant: 'tonal' },
+VDialog: { VCard: { variant: 'flat' } },
+VTooltip: { contentClass: 'lv-tooltip' },
+VMenu: { contentClass: 'lv-menu' },
 }
 Auto-imports under components/** and composables/** (path-prefix off); utils/ is excluded from auto-import scanning to avoid false-positive named exports.
 
@@ -294,8 +294,8 @@ Four top-level concerns mirror the Wealth Atlas blueprint:
 app.vue — Vuetify root, global dialogs, conditional framework rendering.
 components/AppHeader.vue — top app bar, always visible on authenticated routes.
 components/yottalert/YottalertShell.vue — the feature shell (left nav + main scrollable area).
-pages/yottalert/*.vue — feature pages wrapped in YottalertShell.
-Critical layout rule: html, body, #__nuxt, .v-application, .v-main are all height: 100%; overflow: hidden in assets/brand-globals.css. Scrolling lives inside YottalertShell's main panel, not the body. This is what allows a pinned header and persistent sidebar with internal scroll.
+pages/yottalert/\*.vue — feature pages wrapped in YottalertShell.
+Critical layout rule: html, body, #\_\_nuxt, .v-application, .v-main are all height: 100%; overflow: hidden in assets/brand-globals.css. Scrolling lives inside YottalertShell's main panel, not the body. This is what allows a pinned header and persistent sidebar with internal scroll.
 
 9.2.1 Top header (AppHeader.vue)
 <v-app-bar app density="default">. Left → right:
@@ -309,13 +309,13 @@ User avatar menu — proxied avatar via useProxiedAvatar.
 Background is a CSS gradient driven by var(--header-gradient-start) → var(--header-gradient-end). Across all presets these are intentionally dark; icons and the wordmark are forced white.
 
 9.2.2 Left nav + main panel (YottalertShell.vue)
-.yottalert-shell                   // 100% column
-  └─ .yottalert-layout             // row, flex: 1
-       ├─ aside.yottalert-sidebar  // 184px fixed, dark, internally scrollable
-       └─ .yottalert-content       // flex: 1, column
-            └─ .yottalert-scroll   // overflow-y: auto
-                 ├─ <slot />       // page main panel
-                 └─ <YottalertProvenanceFooter />
+.yottalert-shell // 100% column
+└─ .yottalert-layout // row, flex: 1
+├─ aside.yottalert-sidebar // 184px fixed, dark, internally scrollable
+└─ .yottalert-content // flex: 1, column
+└─ .yottalert-scroll // overflow-y: auto
+├─ <slot /> // page main panel
+└─ <YottalertProvenanceFooter />
 Sidebar contract:
 
 Width: flex: 0 0 184px.
@@ -324,7 +324,7 @@ Foreground: --lv-sidebar-fg-rgb so chrome stays light text on dark even when the
 Sections: 14px SVG icon + 10px uppercase letter-spaced label, divided by 1px translucent borders.
 Yottalert's sidebar sections:
 
-Section	Items
+Section Items
 Navigation
 Dashboard · Alerts · Alert Builder · Entities · Geographies · Digest · Settings
 Watchlists
@@ -337,26 +337,28 @@ Active link uses rgba(63, 234, 0, 0.16) background with HSL primary text — int
 
 9.2.3 Page wrap pattern
 <template>
-  <YottalertShell>
-    <main class="alerts-page">
-      <header class="page-head">
-        <span class="kicker">YOTTALERT</span>
-        <h1 class="page-title">Recent alerts</h1>
-        <p class="page-subtitle">12 high severity · 34 medium · last sync 3m ago</p>
-      </header>
-      <section>...</section>
-    </main>
-  </YottalertShell>
+<YottalertShell>
+<main class="alerts-page">
+<header class="page-head">
+<span class="kicker">YOTTALERT</span>
+<h1 class="page-title">Recent alerts</h1>
+<p class="page-subtitle">12 high severity · 34 medium · last sync 3m ago</p>
+</header>
+<section>...</section>
+</main>
+</YottalertShell>
 </template>
+
 <script setup lang="ts">
 definePageMeta({ layout: false });
 </script>
+
 max-width: 1640px for the dashboard, 960px for narrow reading surfaces (alert detail, builder).
 
 9.3 Theming
 Single source of truth: utils/theme/themePresets.ts. Ship five presets to start:
 
-ID	Mode	Notes
+ID Mode Notes
 lovelace-dark
 dark
 Default cyber-dark Lovelace brand
@@ -377,23 +379,23 @@ Each preset's tokens includes brand colors (primary, primaryStrong, secondary, a
 Two-channel application in useLovelaceTheme.applyThemeById:
 
 vuetifyTheme.change(preset.vuetifyTheme) — swaps Vuetify M3 components.
-applyCssVariables(preset) — writes ~30 --dynamic-* properties onto document.documentElement, plus data-theme-id and data-theme-mode.
+applyCssVariables(preset) — writes ~30 --dynamic-\* properties onto document.documentElement, plus data-theme-id and data-theme-mode.
 Canonical patterns:
 
 .chip {
-  background: rgba(var(--dynamic-fg-rgb), 0.06);
-  color: var(--dynamic-text-secondary);
-  border: 1px solid rgba(var(--dynamic-fg-rgb), 0.12);
+background: rgba(var(--dynamic-fg-rgb), 0.06);
+color: var(--dynamic-text-secondary);
+border: 1px solid rgba(var(--dynamic-fg-rgb), 0.12);
 }
 .chip.primary {
-  background: rgba(var(--dynamic-primary-rgb), 0.15);
-  color: var(--dynamic-primary-strong);
+background: rgba(var(--dynamic-primary-rgb), 0.15);
+color: var(--dynamic-primary-strong);
 }
 Persistence: active theme persists to KV at /users/{uid}/apps/yottalert/settings/theme; last-dark and last-light tracked separately in localStorage for Quick Toggle. First-visit default reads prefers-color-scheme.
 
 Severity color mapping (Yottalert-specific addition):
 
-Severity	Token	Default values
+Severity Token Default values
 High
 --dynamic-severity-high
 hsl(0 72% 51%) / hsl(0 62% 50%) (red, mapped to --status-danger from design-tokens.md)
@@ -409,7 +411,7 @@ hsl(0 0% 60%) / hsl(0 0% 50%) (gray, --status-neutral)
 Badge pattern: 12% opacity background + 30% opacity border + full-strength text (carried directly from design-tokens.md's bg-status-{level}/12 text-status-{level} border border-status-{level}/30).
 
 9.4 Typography
-Token	Use
+Token Use
 --font-primary / --font-brand
 FK Grotesk / Inter / Space Grotesk fallback — body
 --font-headline
@@ -418,7 +420,7 @@ FK Grotesk Mono — page titles and section headings, weight 400
 FK Grotesk Mono / JetBrains Mono — chips, kickers, scores, IDs, "data" feel
 Standard size scale:
 
-Class	Definition
+Class Definition
 .text-page-title
 text-3xl font-semibold tracking-tight
 .text-section-title
@@ -514,7 +516,9 @@ Alert builder — while resolveUserWatchQuery runs.
 "Check now" — while a rule's sync runs.
 Digest generation — while Gemini composes the daily/weekly digest.
 Yottalert agent taxonomy (extends the standard 4-step backbone)
-#	Agent	Icon	Color	Working text	Completed text
+
+# Agent Icon Color Working text Completed text
+
 1
 Dialogue Agent
 mdi-head-question
@@ -584,10 +588,15 @@ Citation Agent — strips any [N] reference whose N is not in the ALLOWED CITATI
 Required output schema:
 
 # What changed
+
 [3-8 bullets, each ending with _(Source: <publication or dataset> [N])_]
+
 # What to watch
+
 [2-3 forward-looking items with sources]
+
 # High-severity alerts
+
 [ordered list with score and one-sentence why-it-matters]
 Frontend (DigestBriefReport.vue) mirrors ZipBriefReport.vue:
 
@@ -601,7 +610,7 @@ Caching: 1 hour by (userId, frequency, style, focus, tone, model); forceRegenera
 Loading state: "Composing daily digest… Numbers are not invented — they come straight from the deterministic substrate."
 
 9.8 Reusable building blocks
-Component	Purpose
+Component Purpose
 AppHeader.vue
 Top bar; theme picker, Elemental status, settings, user menu
 YottalertShell.vue
@@ -631,9 +640,9 @@ Global preferences (theme, defaults, connections)
 Composables: useLovelaceTheme(), useAgentChat(), useAlertRuleBuilder(), useElementalStatus(), usePrefsStore() + Pref<T>, useUserState(), useTenantConfig(), useNotification(), useProxiedAvatar().
 
 10. Empty and Error States
-Render explicit, well-named states for every failure mode (the app is live-data-dependent, so empty states matter):
+    Render explicit, well-named states for every failure mode (the app is live-data-dependent, so empty states matter):
 
-State	UX
+State UX
 Elemental connection unavailable
 Banner in header (red dot), retry CTA, link to connection settings
 MCP tool unavailable
@@ -653,28 +662,28 @@ Watch query too ambiguous
 Agent-error surface for streaming runs uses the Wealth Atlas pattern: red-tinted panel inside the message stream, bold "Agent failed." headline in #fca5a5, plain message, optional mono detail, Retry button.
 
 11. Security
-MCP and API credentials stored server-side only.
-No raw MCP tool invocation from the browser. All Elemental calls route through /server/api/*.
-Role-based access checks before every Elemental query.
-All Elemental object access logged (user, time, object ID, tool/endpoint).
-All natural-language watch queries logged for auditability.
-No untrusted tool output rendered as executable HTML (markdown rendering uses the inline-friendly renderer described in 2026-05-20_ui_prd.md §4.4; if fenced code or tables become needed, swap to marked + DOMPurify).
-Rate limiting on /api/sync/* and /api/alert-rules/interpret.
-Organization-level Elemental connection settings (users inherit credentials from their org).
+    MCP and API credentials stored server-side only.
+    No raw MCP tool invocation from the browser. All Elemental calls route through /server/api/_.
+    Role-based access checks before every Elemental query.
+    All Elemental object access logged (user, time, object ID, tool/endpoint).
+    All natural-language watch queries logged for auditability.
+    No untrusted tool output rendered as executable HTML (markdown rendering uses the inline-friendly renderer described in 2026-05-20_ui_prd.md §4.4; if fenced code or tables become needed, swap to marked + DOMPurify).
+    Rate limiting on /api/sync/_ and /api/alert-rules/interpret.
+    Organization-level Elemental connection settings (users inherit credentials from their org).
 12. Build Priority
-Elemental connection settings page + elementalMcpClient.ts + elementalApiClient.ts.
-Alert-rule schema + database migrations.
-Alert Builder with natural-language interpretation (live agent steps for the resolver call).
-Manual Check now workflow + sync-run record.
-changeDetectionService.ts + alertScoringService.ts.
-Dashboard.
-Alert Detail page (with full provenance and feedback).
-Entity Context Drawer + Geography Context Page.
-Feedback loop (writes to alert_feedback, surfaces in scoring weights over time).
-Daily digest via Gemini brief pipeline.
-Scheduled sync (cron/queue) for as_it_happens, daily_digest, weekly_digest rules.
+    Elemental connection settings page + elementalMcpClient.ts + elementalApiClient.ts.
+    Alert-rule schema + database migrations.
+    Alert Builder with natural-language interpretation (live agent steps for the resolver call).
+    Manual Check now workflow + sync-run record.
+    changeDetectionService.ts + alertScoringService.ts.
+    Dashboard.
+    Alert Detail page (with full provenance and feedback).
+    Entity Context Drawer + Geography Context Page.
+    Feedback loop (writes to alert_feedback, surfaces in scoring weights over time).
+    Daily digest via Gemini brief pipeline.
+    Scheduled sync (cron/queue) for as_it_happens, daily_digest, weekly_digest rules.
 13. Acceptance Criteria
-The v1 is successful when:
+    The v1 is successful when:
 
 A user can connect Yottalert to Elemental.
 A user can create an alert rule from natural language; Elemental resolves it; the structured interpretation is editable before save.
@@ -683,7 +692,7 @@ Every alert displays entities, events, relationships, sources, confidence, and p
 The user can give feedback on every alert; feedback persists.
 The app degrades cleanly when MCP, API, KV, or GEMINI_API_KEY are missing.
 Header is pinned, left nav is persistent and dark-anchored, and the main panel is the only scroll container on every page.
-Theme picker swaps Vuetify components and --dynamic-* tokens simultaneously and survives reload.
+Theme picker swaps Vuetify components and --dynamic-\* tokens simultaneously and survives reload.
 Chat surfaces (interpreter, check-now, digest) stream via SSE, show a live workflow card under the in-flight bubble, and reveal long outputs at ~840 chars/sec via the typewriter.
 Digest contains no number absent from the deterministic data context and no [N] reference outside the ALLOWED CITATIONS set.
 
@@ -693,4 +702,4 @@ Project just created. Run `/build_my_app` in Cursor to start building.
 
 ## Modules
 
-*None yet — the agent will populate this as features are built.*
+_None yet — the agent will populate this as features are built._
