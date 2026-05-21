@@ -44,7 +44,9 @@ export async function runSyncForRule(rule: AlertRule): Promise<RunOutcome> {
     };
 
     try {
-        const candidates = await changeDetectionService.detectChanges(rule);
+        const signal = await yottalertStore.getRuleFeedbackSignal(rule.id);
+        const suppression = await yottalertStore.getRuleSuppressionList(rule.id);
+        const candidates = await changeDetectionService.detectChanges(rule, suppression);
         syncRun.objectsChecked = candidates.reduce(
             (acc, c) => acc + c.entities.length + c.events.length + c.relationships.length,
             0
@@ -58,10 +60,12 @@ export async function runSyncForRule(rule: AlertRule): Promise<RunOutcome> {
                 candidate.elementalEntityIds.includes(id)
             );
 
-            const scoring = alertScoringService.scoreCandidate({
+            const baseScoring = alertScoringService.scoreCandidate({
                 rule,
                 candidate: { ...candidate, isNew },
+                suppression,
             });
+            const scoring = alertScoringService.applyFeedbackAdjustment(baseScoring, signal);
 
             const provenanceStatus = provenanceService.rollupProvenanceStatus(candidate.evidence);
 
@@ -90,6 +94,7 @@ export async function runSyncForRule(rule: AlertRule): Promise<RunOutcome> {
                 severity: scoring.severity,
                 score: scoring.score,
                 scoreBreakdown: scoring.breakdown,
+                feedbackAdjustment: scoring.feedbackAdjustment,
                 confidence: provenanceService.rollupConfidence(candidate.evidence),
                 createdAt: new Date().toISOString(),
                 sourceCount: candidate.evidence.length,

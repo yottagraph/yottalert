@@ -59,6 +59,9 @@
                 <section class="block">
                     <h2 class="section-title">Score breakdown</h2>
                     <AlertScoreBreakdown :breakdown="alert.scoreBreakdown" />
+                    <div v-if="feedbackAdjustmentLabel" class="feedback-adjustment">
+                        Feedback adjustment: {{ feedbackAdjustmentLabel }}
+                    </div>
                 </section>
 
                 <section class="block">
@@ -77,17 +80,19 @@
                 <section v-if="alert.entities.length" class="block">
                     <h2 class="section-title">Entities involved</h2>
                     <div class="chips">
-                        <button
-                            v-for="ent in alert.entities"
-                            :key="ent.neid"
-                            class="entity-chip"
-                            type="button"
-                            @click="openEntity(ent)"
-                        >
-                            <v-icon icon="mdi-office-building-outline" size="12" />
-                            <span>{{ ent.name }}</span>
-                            <span v-if="ent.type" class="entity-type">{{ ent.type }}</span>
-                        </button>
+                        <div v-for="ent in alert.entities" :key="ent.neid" class="entity-wrap">
+                            <button class="entity-chip" type="button" @click="openEntity(ent)">
+                                <v-icon icon="mdi-office-building-outline" size="12" />
+                                <span>{{ ent.name }}</span>
+                                <span v-if="ent.type" class="entity-type">{{ ent.type }}</span>
+                            </button>
+                            <NuxtLink
+                                :to="`/yottalert/provenance/${encodeURIComponent(ent.neid)}`"
+                                class="prov-link"
+                            >
+                                provenance
+                            </NuxtLink>
+                        </div>
                     </div>
                 </section>
 
@@ -109,7 +114,14 @@
                                     {{ evt.occurredAt ? relativeTime(evt.occurredAt) : '—' }}
                                 </td>
                                 <td class="mono">{{ evt.type }}</td>
-                                <td>{{ evt.title }}</td>
+                                <td>
+                                    <NuxtLink
+                                        :to="`/yottalert/provenance/${encodeURIComponent(evt.id)}`"
+                                        class="event-link"
+                                    >
+                                        {{ evt.title }}
+                                    </NuxtLink>
+                                </td>
                                 <td>{{ evt.geography ?? '—' }}</td>
                                 <td class="mono">{{ Math.round(evt.confidence * 100) }}%</td>
                             </tr>
@@ -145,7 +157,12 @@
                             :id="`source-${idx + 1}`"
                             :key="ev.id"
                         >
-                            <span class="ref-n">[{{ idx + 1 }}]</span>
+                            <NuxtLink
+                                class="ref-n"
+                                :to="`/yottalert/provenance/${encodeURIComponent(ev.elementalSourceId ?? ev.elementalObjectId ?? ev.id)}`"
+                            >
+                                [{{ idx + 1 }}]
+                            </NuxtLink>
                             <div class="ev-body">
                                 <div class="ev-text">{{ ev.displayText }}</div>
                                 <div class="ev-meta">
@@ -188,6 +205,7 @@
     import { computed, onMounted, ref } from 'vue';
     import { useRoute } from 'vue-router';
 
+    import { useRuleFeedback } from '~/composables/useRuleFeedback';
     import type { AlertEntityRef, AlertRule, YottalertAlert } from '~/utils/yottalert/types';
     import { relativeTime, severityTone } from '~/utils/yottalert/severity';
 
@@ -200,6 +218,7 @@
 
     const drawerOpen = ref(false);
     const drawerEntity = ref<AlertEntityRef | null>(null);
+    const { signal, load: loadSignal } = useRuleFeedback();
 
     onMounted(load);
 
@@ -211,6 +230,9 @@
             );
             alert.value = res.alert;
             rule.value = res.rule;
+            if (res.rule?.id) {
+                await loadSignal(res.rule.id);
+            }
         } catch {
             alert.value = null;
         } finally {
@@ -221,6 +243,19 @@
     const severityLabel = computed(() =>
         alert.value ? severityTone(alert.value.severity).label.toUpperCase() : ''
     );
+    const feedbackAdjustmentLabel = computed(() => {
+        if (!alert.value || !Number.isFinite(alert.value.feedbackAdjustment)) return '';
+        const delta = alert.value.feedbackAdjustment as number;
+        const direction = delta > 0 ? '+' : '';
+        let reason = 'recent feedback on this rule';
+        if (signal.value) {
+            if (signal.value.noiseScore > signal.value.utilityScore)
+                reason = 'noise complaints on this rule';
+            if (signal.value.utilityScore > signal.value.noiseScore)
+                reason = 'useful/add-similar feedback';
+        }
+        return `${direction}${delta} points (${reason}).`;
+    });
 
     function openEntity(ent: AlertEntityRef) {
         drawerEntity.value = ent;
@@ -358,6 +393,11 @@
         flex-wrap: wrap;
         gap: 6px;
     }
+    .entity-wrap {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
     .entity-chip {
         display: inline-flex;
         align-items: center;
@@ -372,6 +412,12 @@
     }
     .entity-chip:hover {
         background: rgba(255, 255, 255, 0.1);
+    }
+    .prov-link,
+    .event-link {
+        color: var(--dynamic-primary);
+        text-decoration: none;
+        font-size: 12px;
     }
     .entity-type {
         font-family: var(--font-mono);
@@ -397,6 +443,11 @@
         padding: 8px;
         border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         color: rgba(255, 255, 255, 0.85);
+    }
+    .feedback-adjustment {
+        margin-top: 10px;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.65);
     }
     .rel-list {
         display: grid;

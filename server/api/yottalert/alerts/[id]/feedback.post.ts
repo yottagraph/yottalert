@@ -2,6 +2,10 @@ import { defineEventHandler, getRouterParam, readBody } from 'h3';
 
 import { yottalertStore } from '~/server/services/yottalertStore';
 import type { AlertFeedback, AlertFeedbackType } from '~/utils/yottalert/types';
+import {
+    applyFeedbackToSuppressionList,
+    computeRuleFeedbackSignal,
+} from '~/utils/yottalert/feedbackAggregation';
 
 export default defineEventHandler(async (event) => {
     const id = getRouterParam(event, 'id');
@@ -27,5 +31,19 @@ export default defineEventHandler(async (event) => {
         createdAt: new Date().toISOString(),
     };
     await yottalertStore.appendFeedback(feedback);
-    return { feedback };
+
+    const feedbackForRule = await yottalertStore.listFeedbackForRule(alert.alertRuleId);
+    const computed = computeRuleFeedbackSignal(feedbackForRule);
+    const signal = {
+        ruleId: alert.alertRuleId,
+        ...computed,
+        updatedAt: new Date().toISOString(),
+    };
+    await yottalertStore.saveRuleFeedbackSignal(signal);
+
+    const existingSuppression = await yottalertStore.getRuleSuppressionList(alert.alertRuleId);
+    const suppression = applyFeedbackToSuppressionList(existingSuppression, alert, feedback);
+    await yottalertStore.saveRuleSuppressionList(suppression);
+
+    return { feedback, signal, suppression };
 });

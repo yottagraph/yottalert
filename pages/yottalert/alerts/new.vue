@@ -138,6 +138,10 @@
                         />
                     </div>
 
+                    <div v-if="editingRuleId && feedbackInfluence" class="feedback-callout">
+                        {{ feedbackInfluence }}
+                    </div>
+
                     <div class="row actions">
                         <v-btn color="primary" :loading="saving" :disabled="!canSave" @click="save">
                             Save alert rule
@@ -183,6 +187,7 @@
     import { computed, onMounted, ref, watch } from 'vue';
     import { useRoute, useRouter } from 'vue-router';
 
+    import { useRuleFeedback } from '~/composables/useRuleFeedback';
     import { useYottalert } from '~/composables/useYottalert';
     import type {
         AlertRule,
@@ -219,6 +224,7 @@
     const checkMessage = ref('');
     const savedRuleId = ref<string | null>(null);
     const editingRuleId = ref<string | null>(null);
+    const { signal, suppression, load: loadFeedbackSignal } = useRuleFeedback();
 
     const frequencies = [
         { label: 'As it happens', value: 'as_it_happens' },
@@ -228,6 +234,21 @@
     ];
 
     const canSave = computed(() => !!prompt.value.trim() && !!structured.value);
+    const feedbackInfluence = computed(() => {
+        if (!editingRuleId.value || !signal.value) return '';
+        const total = signal.value.totalFeedback;
+        const utility = Math.round(signal.value.utilityScore * 100);
+        const noise = Math.round(signal.value.noiseScore * 100);
+        const suppressed = suppression.value
+            ? suppression.value.suppressedEntityIds.length +
+              suppression.value.suppressedGeographySlugs.length
+            : 0;
+        const boosted = suppression.value
+            ? suppression.value.boostedEntityIds.length +
+              suppression.value.boostedGeographySlugs.length
+            : 0;
+        return `Feedback influence: ${total} responses (${utility}% utility / ${noise}% noise), ${suppressed} suppressed target(s), ${boosted} boosted target(s).`;
+    });
 
     async function interpret() {
         interpretLoading.value = true;
@@ -330,6 +351,7 @@
             }
             savedRuleId.value = res.rule.id;
             editingRuleId.value = res.rule.id;
+            await loadFeedbackSignal(res.rule.id);
             checkMessage.value = `Saved rule ${res.rule.id} — click "Check now" to run a sync.`;
             await refreshAll();
         } catch (err) {
@@ -391,6 +413,7 @@
             name: e.name,
         }));
         interpretSource.value = 'loaded';
+        loadFeedbackSignal(rule.id);
     }
 </script>
 
@@ -468,6 +491,15 @@
     }
     .row.actions {
         margin-top: 4px;
+    }
+    .feedback-callout {
+        margin-bottom: 10px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(var(--dynamic-primary-rgb), 0.35);
+        background: rgba(var(--dynamic-primary-rgb), 0.12);
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.9);
     }
     .latency {
         font-family: var(--font-mono);

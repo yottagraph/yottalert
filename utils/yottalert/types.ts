@@ -131,6 +131,7 @@ export interface YottalertAlert {
     createdAt: string;
     sourceCount: number;
     provenanceStatus: ProvenanceStatus;
+    feedbackAdjustment?: number;
     status: AlertStatus;
     elementalEntityIds: string[];
     elementalEventIds: string[];
@@ -162,6 +163,45 @@ export interface AlertFeedback {
     feedbackType: AlertFeedbackType;
     comment?: string;
     createdAt: string;
+}
+
+export interface RuleFeedbackSignal {
+    ruleId: string;
+    totalFeedback: number;
+    counts: Record<AlertFeedbackType, number>;
+    utilityScore: number;
+    noiseScore: number;
+    sensitivityDelta: number;
+    updatedAt: string;
+}
+
+export interface RuleSuppressionList {
+    ruleId: string;
+    suppressedEntityIds: string[];
+    suppressedGeographySlugs: string[];
+    boostedEntityIds: string[];
+    boostedGeographySlugs: string[];
+    updatedAt: string;
+}
+
+export interface ProvenanceRecord {
+    objectId: string;
+    objectType: 'entity' | 'event' | 'relationship' | 'source' | 'unknown';
+    sourceDocument?: {
+        name: string;
+        url?: string;
+        type: string;
+    };
+    ingestedAt?: string;
+    publishedAt?: string;
+    extractedClaim?: string;
+    entityResolutionConfidence?: number;
+    relationshipConfidence?: number;
+    eventExtractionConfidence?: number;
+    geographyResolutionConfidence?: number;
+    elementalObjectIds: string[];
+    relatedAlerts: Array<{ alertId: string; alertTitle: string; createdAt: string }>;
+    status: ProvenanceStatus;
 }
 
 export interface SyncRun {

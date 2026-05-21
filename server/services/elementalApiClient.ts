@@ -30,6 +30,18 @@ interface RecentChange {
     occurredAt?: string;
 }
 
+interface ProvenanceFetch {
+    sourceDocument?: { name?: string; url?: string; type?: string };
+    ingestedAt?: string;
+    publishedAt?: string;
+    extractedClaim?: string;
+    entityResolutionConfidence?: number;
+    relationshipConfidence?: number;
+    eventExtractionConfidence?: number;
+    geographyResolutionConfidence?: number;
+    elementalObjectIds?: string[];
+}
+
 function gatewayBase(): { url: string; org: string; key: string } {
     const config = useRuntimeConfig();
     const pub = config.public as Record<string, string>;
@@ -178,6 +190,21 @@ export async function getSchemaSummary(): Promise<{
     }
 }
 
+export async function fetchProvenance(objectId: string): Promise<ProvenanceFetch | null> {
+    if (!isConfigured() || !objectId) return null;
+    try {
+        return await $fetch<ProvenanceFetch>(
+            buildUrl(`provenance/${encodeURIComponent(objectId)}`),
+            {
+                headers: headers(),
+                timeout: 5000,
+            }
+        );
+    } catch {
+        return null;
+    }
+}
+
 function errorMessage(err: unknown): string {
     if (err instanceof Error) return err.message;
     return String(err);
@@ -190,6 +217,7 @@ export const elementalApiClient = {
     getEntityNameByNeid,
     fetchRecentChanges,
     getSchemaSummary,
+    fetchProvenance,
 };
 
 export type ElementalApiClient = typeof elementalApiClient;

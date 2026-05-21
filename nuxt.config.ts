@@ -9,6 +9,7 @@ import {
     writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
+import { DEFAULT_THEME_ID, THEME_PRESETS } from './utils/theme/themePresets';
 
 // Read tenant config from broadchurch.yaml (committed by tenant-init) so the
 // runtime config has correct defaults even when .env is missing or stale.
@@ -101,25 +102,16 @@ export default defineNuxtConfig({
     vuetify: {
         vuetifyOptions: {
             theme: {
-                defaultTheme: 'lovelaceDark',
-                themes: {
-                    lovelaceDark: {
-                        dark: true,
-                        colors: {
-                            background: '#0a0a0a',
-                            surface: '#141414',
-                            'surface-variant': '#1c1c1c',
-                            primary: '#3fea00',
-                            secondary: '#003bff',
-                            warning: '#ff5c00',
-                            error: '#ef4444',
-                            info: '#003bff',
-                            success: '#3fea00',
-                            'on-background': '#e5e5e5',
-                            'on-surface': '#e5e5e5',
+                defaultTheme: DEFAULT_THEME_ID,
+                themes: Object.fromEntries(
+                    THEME_PRESETS.map((preset) => [
+                        preset.id,
+                        {
+                            dark: preset.vuetifyTheme.dark,
+                            colors: preset.vuetifyTheme.colors,
                         },
-                    },
-                },
+                    ])
+                ),
             },
             defaults: {
                 VBtn: { variant: 'flat', rounded: 'lg' },

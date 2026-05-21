@@ -16,6 +16,29 @@
         <!-- Spacer to center the title -->
         <v-spacer></v-spacer>
 
+        <v-menu location="bottom end" :close-on-content-click="false">
+            <template #activator="{ props }">
+                <v-btn icon v-bind="props" class="ml-1" color="white">
+                    <v-icon icon="mdi-palette-outline" color="white" />
+                </v-btn>
+            </template>
+            <v-card class="theme-menu">
+                <v-card-title class="theme-menu-title">Appearance</v-card-title>
+                <v-card-text>
+                    <ThemePresetPicker variant="compact" />
+                    <v-btn
+                        class="mt-3"
+                        block
+                        variant="outlined"
+                        prepend-icon="mdi-theme-light-dark"
+                        @click="toggleDarkLight"
+                    >
+                        Quick Toggle
+                    </v-btn>
+                </v-card-text>
+            </v-card>
+        </v-menu>
+
         <!-- Elemental connection status pill -->
         <ElementalStatusPill class="mr-2" />
 
@@ -84,7 +107,7 @@
 
     import { state } from '~/utils/appState';
 
-    const { currentThemeColors } = useLovelaceTheme();
+    const { currentThemeColors, toggleDarkLight } = useLovelaceTheme();
     const { clearUser, userPicture, userName } = useUserState();
     const { appName } = useAppInfo();
     const router = useRouter();
@@ -172,5 +195,14 @@
         margin-left: 8px;
         position: relative;
         top: 2px;
+    }
+    .theme-menu {
+        min-width: 260px;
+    }
+    .theme-menu-title {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
     }
 </style>

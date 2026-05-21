@@ -20,7 +20,14 @@ import {
 } from '../utils/localFsPrefsStore';
 import { getRedis, isKVConfigured } from '../utils/redis';
 
-import type { AlertFeedback, AlertRule, SyncRun, YottalertAlert } from '~/utils/yottalert/types';
+import type {
+    AlertFeedback,
+    AlertRule,
+    RuleFeedbackSignal,
+    RuleSuppressionList,
+    SyncRun,
+    YottalertAlert,
+} from '~/utils/yottalert/types';
 
 const ROOT = 'yottalert';
 
@@ -178,6 +185,27 @@ export const yottalertStore = {
     },
     async listFeedback(alertId: string): Promise<AlertFeedback[]> {
         return listDocs<AlertFeedback>(`feedback:${alertId}`);
+    },
+    async listFeedbackForRule(ruleId: string): Promise<AlertFeedback[]> {
+        const alerts = await listDocs<YottalertAlert>('alerts');
+        const alertIds = alerts.filter((a) => a.alertRuleId === ruleId).map((a) => a.id);
+        if (!alertIds.length) return [];
+        const batches = await Promise.all(
+            alertIds.map((id) => listDocs<AlertFeedback>(`feedback:${id}`))
+        );
+        return batches.flat();
+    },
+    async getRuleFeedbackSignal(ruleId: string): Promise<RuleFeedbackSignal | null> {
+        return getDoc<RuleFeedbackSignal>('rule_feedback_signals', ruleId);
+    },
+    async saveRuleFeedbackSignal(signal: RuleFeedbackSignal): Promise<void> {
+        await setDoc('rule_feedback_signals', signal.ruleId, signal);
+    },
+    async getRuleSuppressionList(ruleId: string): Promise<RuleSuppressionList | null> {
+        return getDoc<RuleSuppressionList>('rule_suppressions', ruleId);
+    },
+    async saveRuleSuppressionList(list: RuleSuppressionList): Promise<void> {
+        await setDoc('rule_suppressions', list.ruleId, list);
     },
 
     async saveSyncRun(run: SyncRun): Promise<void> {

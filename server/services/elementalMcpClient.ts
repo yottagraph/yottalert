@@ -64,12 +64,17 @@ export async function getEventsForEntity(entityId: string) {
     return changes;
 }
 
+export async function getProvenanceForObject(objectId: string) {
+    return elementalApiClient.fetchProvenance(objectId);
+}
+
 export const elementalMcpClient = {
     pingMcp,
     searchEntities,
     getEntity,
     getEntitiesForGeography,
     getEventsForEntity,
+    getProvenanceForObject,
     toolSurface: () => STABLE_TOOL_SURFACE,
 };
 

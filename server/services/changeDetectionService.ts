@@ -14,6 +14,7 @@ import type {
     AlertEventRef,
     AlertRelationshipRef,
     AlertRule,
+    RuleSuppressionList,
 } from '~/utils/yottalert/types';
 import { elementalApiClient } from './elementalApiClient';
 
@@ -31,6 +32,13 @@ export interface ChangeCandidate {
     elementalEventIds: string[];
     elementalRelationshipIds: string[];
     elementalObjectIds: string[];
+}
+
+function slugify(s?: string): string {
+    return (s || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
 }
 
 function nowIso(): string {
@@ -156,7 +164,10 @@ function humanize(slug: string): string {
     return slug.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export async function detectChanges(rule: AlertRule): Promise<ChangeCandidate[]> {
+export async function detectChanges(
+    rule: AlertRule,
+    suppression?: RuleSuppressionList | null
+): Promise<ChangeCandidate[]> {
     const apiConfigured = elementalApiClient.isConfigured();
     const entities = await gatherEntitiesForRule(rule);
     const events = makeEvents(rule, entities);
@@ -201,7 +212,17 @@ export async function detectChanges(rule: AlertRule): Promise<ChangeCandidate[]>
         });
     }
 
-    return candidates;
+    if (!suppression) return candidates;
+
+    return candidates.filter((candidate) => {
+        const suppressedEntityHit = suppression.suppressedEntityIds.some((id) =>
+            candidate.elementalEntityIds.includes(id)
+        );
+        const suppressedGeoHit =
+            !!candidate.geographyLabel &&
+            suppression.suppressedGeographySlugs.includes(slugify(candidate.geographyLabel));
+        return !suppressedEntityHit && !suppressedGeoHit;
+    });
 }
 
 export const changeDetectionService = { detectChanges };

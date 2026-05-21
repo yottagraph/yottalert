@@ -7,7 +7,14 @@
  * (§5.7) are mapped from the final integer score.
  */
 
-import type { AlertRule, ScoreBreakdown, Severity, YottalertAlert } from '~/utils/yottalert/types';
+import type {
+    AlertRule,
+    RuleFeedbackSignal,
+    RuleSuppressionList,
+    ScoreBreakdown,
+    Severity,
+    YottalertAlert,
+} from '~/utils/yottalert/types';
 import { severityForScore } from '~/utils/yottalert/severity';
 
 interface ScoreInputs {
@@ -21,6 +28,7 @@ interface ScoreInputs {
         | 'elementalRelationshipIds'
         | 'geographyLabel'
     > & { isNew?: boolean; recencyMinutes?: number };
+    suppression?: RuleSuppressionList | null;
 }
 
 function clamp01(n: number): number {
@@ -35,7 +43,20 @@ function relevance(inputs: ScoreInputs): number {
         Number(candidate.elementalEntityIds.length > 0) +
         Number(candidate.elementalEventIds.length > 0) +
         Number(candidate.elementalRelationshipIds.length > 0);
-    return clamp01(0.35 + 0.18 * matches);
+    const geoSlug = (candidate.geographyLabel || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    const boostedEntityHit = Boolean(
+        inputs.suppression?.boostedEntityIds?.some((id) =>
+            candidate.elementalEntityIds.includes(id)
+        )
+    );
+    const boostedGeoHit = Boolean(
+        geoSlug && inputs.suppression?.boostedGeographySlugs?.includes(geoSlug)
+    );
+    const boost = boostedEntityHit || boostedGeoHit ? 0.08 : 0;
+    return clamp01(0.35 + 0.18 * matches + boost);
 }
 
 function novelty(inputs: ScoreInputs): number {
@@ -81,6 +102,7 @@ export interface ScoreResult {
     score: number;
     severity: Severity;
     breakdown: ScoreBreakdown;
+    feedbackAdjustment?: number;
 }
 
 export function scoreCandidate(inputs: ScoreInputs): ScoreResult {
@@ -104,5 +126,26 @@ export function scoreCandidate(inputs: ScoreInputs): ScoreResult {
     };
 }
 
-export const alertScoringService = { scoreCandidate };
+function clamp(n: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, n));
+}
+
+export function applyFeedbackAdjustment(
+    result: ScoreResult,
+    signal?: RuleFeedbackSignal | null
+): ScoreResult {
+    if (!signal || signal.totalFeedback === 0) return result;
+    const utility = (signal.utilityScore - signal.noiseScore) * 0.25;
+    const sensitivity = -signal.sensitivityDelta;
+    const factor = clamp(1 + utility + sensitivity, 0.6, 1.3);
+    const adjustedScore = Math.round(result.score * factor);
+    return {
+        ...result,
+        score: adjustedScore,
+        severity: severityForScore(adjustedScore),
+        feedbackAdjustment: adjustedScore - result.score,
+    };
+}
+
+export const alertScoringService = { scoreCandidate, applyFeedbackAdjustment };
 export type AlertScoringService = typeof alertScoringService;

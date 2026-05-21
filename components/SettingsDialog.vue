@@ -14,6 +14,12 @@
             <v-container>
                 <v-row>
                     <v-col cols="12">
+                        <h3 class="text-h6 mb-2">Appearance</h3>
+                        <ThemePresetPicker variant="full" />
+                    </v-col>
+                </v-row>
+                <v-row>
+                    <v-col cols="12">
                         <h3 class="text-h6 mb-2">Server Configuration</h3>
                         <div class="mt-3">
                             <div class="text-body-2 mb-1">Current Query Server:</div>
