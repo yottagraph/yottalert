@@ -35,6 +35,25 @@
     --font-headline: 'FK Grotesk Mono', 'Inter', system-ui, sans-serif;
     --font-brand: 'Inter', system-ui, -apple-system, sans-serif;
     --font-mono: 'FK Grotesk Mono', 'JetBrains Mono', 'Fira Code', monospace;
+
+    /* Yottalert sidebar (always dark, doesn't theme) */
+    --lv-sidebar-bg: #08090b;
+    --lv-sidebar-fg-rgb: 229, 229, 229;
+    --lv-sidebar-divider: rgba(255, 255, 255, 0.06);
+
+    /* Yottalert severity tokens (12% bg + 30% border + full text) */
+    --dynamic-severity-high: hsl(0 72% 51%);
+    --dynamic-severity-medium: hsl(36 100% 50%);
+    --dynamic-severity-low: hsl(226 100% 60%);
+    --dynamic-severity-suppressed: hsl(0 0% 60%);
+    --dynamic-severity-high-rgb: 217, 70, 70;
+    --dynamic-severity-medium-rgb: 255, 159, 10;
+    --dynamic-severity-low-rgb: 51, 102, 255;
+    --dynamic-severity-suppressed-rgb: 153, 153, 153;
+
+    /* Yottalert primary RGB (cyber green for tinted overlays) */
+    --dynamic-primary-rgb: 63, 234, 0;
+    --dynamic-fg-rgb: 229, 229, 229;
 }
 
 * {

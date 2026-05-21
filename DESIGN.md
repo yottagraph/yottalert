@@ -256,7 +256,7 @@ Every alert must show: source document/item, source URL or identifier, ingestion
    GET /api/digest/daily
    POST /api/sync/run
 9. UI Specification
-   Stack note: The canonical implementation follows the Wealth Atlas blueprint (2026-05-20_ui_prd.md): Nuxt 3 + Vue 3 + Vuetify 3 + TypeScript, SPA mode, file-based routing under pages/, file-based API under server/api/. The palette/typography rules from design-tokens.md (HSL CSS custom properties, Space Grotesk + JetBrains Mono, sidebar-always-dark) are adopted but expressed as the Wealth Atlas --dynamic-_ / --lv-sidebar-_ token names. The page primitives from ui-architecture.md (PageHeader / SectionCard / FilterBar) are reused as Vue equivalents.
+   Stack note: The canonical implementation follows the Wealth Atlas blueprint (2026-05-20*ui_prd.md): Nuxt 3 + Vue 3 + Vuetify 3 + TypeScript, SPA mode, file-based routing under pages/, file-based API under server/api/. The palette/typography rules from design-tokens.md (HSL CSS custom properties, Space Grotesk + JetBrains Mono, sidebar-always-dark) are adopted but expressed as the Wealth Atlas --dynamic-* / --lv-sidebar-\_ token names. The page primitives from ui-architecture.md (PageHeader / SectionCard / FilterBar) are reused as Vue equivalents.
 
 9.1 Stack and conventions
 Layer Choice
@@ -338,6 +338,7 @@ Active link uses rgba(63, 234, 0, 0.16) background with HSL primary text — int
 9.2.3 Page wrap pattern
 <template>
 <YottalertShell>
+
 <main class="alerts-page">
 <header class="page-head">
 <span class="kicker">YOTTALERT</span>
@@ -698,8 +699,62 @@ Digest contains no number absent from the deterministic data context and no [N] 
 
 ## Status
 
-Project just created. Run `/build_my_app` in Cursor to start building.
+MVP scaffolded. See `design/requirements.md` for the prioritized
+MVP/P1/P2 breakdown extracted from this brief and the running
+implementation checklist.
 
 ## Modules
 
-_None yet — the agent will populate this as features are built._
+- **Three-pane shell** — `components/AppHeader.vue` (with new
+  `ElementalStatusPill`) + `components/yottalert/YottalertShell.vue`
+  (persistent 184px dark sidebar) + `YottalertProvenanceFooter`.
+  Severity tokens (`--dynamic-severity-*`) and sidebar tokens added to
+  `assets/brand-globals.css`.
+- **Dashboard** — `pages/yottalert/index.vue` with `StatusStrip`,
+  high-priority alert grid, recent alerts list, watched-geographies
+  and watched-entities chip clouds. Empty states wired everywhere.
+- **Alert Builder** — `pages/yottalert/alerts/new.vue`. Natural-language
+  prompt → `/api/yottalert/alert-rules/interpret` → editable
+  `StructuredRulePreview` → save + Check now.
+- **Alert Detail** — `pages/yottalert/alerts/[id].vue`. Score
+  breakdown, summary block, entity/event/relationship sections,
+  evidence + provenance, sticky `AlertFeedbackBar`.
+- **Entity Context Drawer** — `components/yottalert/EntityContextDrawer.vue`,
+  opens from any entity chip on the detail page.
+- **Geography page** — `pages/yottalert/geographies/[slug].vue`.
+- **Digest** — `pages/yottalert/digest.vue` backed by the
+  deterministic composer in `server/services/digestService.ts`. Source
+  chip flips to green when Gemini is later wired up.
+- **Elemental Connection Settings** — `pages/yottalert/settings/elemental.vue`
+  with live status panel + stable MCP surface table.
+- **Server services** — `server/services/`:
+    - `elementalApiClient.ts` — typed REST wrapper over the portal
+      gateway (no GCP credentials in the app).
+    - `elementalMcpClient.ts` — Yottalert's stable MCP surface
+      (degrades to REST when the MCP server is unreachable).
+    - `watchRuleInterpreter.ts` — deterministic NL → structured rule.
+    - `changeDetectionService.ts` — per-rule candidate synthesis,
+      uses real Elemental entities when reachable.
+    - `alertScoringService.ts` — 6-component score (geometric mean × 100).
+    - `alertExplanationService.ts` — title/summary/why/what/next.
+    - `provenanceService.ts` — confidence + status rollup.
+    - `syncScheduler.ts` — `runSyncForRule()` (manual + future cron).
+    - `digestService.ts` — deterministic Gemini-style brief.
+    - `yottalertStore.ts` — KV (Upstash) or local-FS fallback for
+      rules / alerts / feedback / sync runs. Stores Elemental object
+      IDs only.
+- **API routes** — under `server/api/yottalert/`:
+    - `alert-rules` (CRUD + interpret + check-now)
+    - `alerts` (list, detail, status, feedback)
+    - `elemental/status` + `elemental/test-connection`
+    - `entities/search` (proxies entity autocomplete to the gateway)
+    - `digest/daily`
+- **Composables** — `useElementalStatus`, `useYottalert`.
+
+## Roadmap (P1/P2)
+
+See `design/requirements.md` for the prioritized backlog. Notable
+follow-ups: live ADK agent SSE workflow (workflow card + typewriter +
+AgentMetaBar), Gemini-narrated digest with citation guardrail, cron
+sync scheduler, Slack/webhook delivery, and the theme picker (5
+presets).

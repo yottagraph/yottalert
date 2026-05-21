@@ -1,0 +1,191 @@
+/**
+ * KV-backed persistence for Yottalert state — alert rules, alerts,
+ * sync runs, feedback (PRD §6).
+ *
+ * Two backends are supported, in order:
+ *   1. Upstash Redis if `KV_REST_API_URL` is set (production / Vercel).
+ *   2. Local filesystem under `.aether-dev-prefs/yottalert/` so `npm run
+ *      dev` and `npm run build` work without external credentials. This
+ *      is the same dev fallback used by `usePrefsStore`.
+ *
+ * The store keeps **Yottalert state only** — every cross-reference to
+ * Elemental graph data is an opaque object ID (PRD architectural rule).
+ */
+
+import {
+    localFsDeleteDoc,
+    localFsListDocuments,
+    localFsReadDoc,
+    localFsWriteField,
+} from '../utils/localFsPrefsStore';
+import { getRedis, isKVConfigured } from '../utils/redis';
+
+import type { AlertFeedback, AlertRule, SyncRun, YottalertAlert } from '~/utils/yottalert/types';
+
+const ROOT = 'yottalert';
+
+function redisKey(collection: string, id?: string): string {
+    return id ? `${ROOT}:${collection}:${id}` : `${ROOT}:${collection}`;
+}
+
+function listKey(collection: string): string {
+    return `${ROOT}:index:${collection}`;
+}
+
+async function withBackend<T>(
+    redisFn: () => Promise<T>,
+    localFn: () => T | Promise<T>
+): Promise<T> {
+    if (isKVConfigured()) {
+        try {
+            return await redisFn();
+        } catch (err) {
+            console.warn('[yottalertStore] Redis op failed, falling back to local FS', err);
+        }
+    }
+    return Promise.resolve(localFn());
+}
+
+function localPath(collection: string, id?: string): string {
+    return id ? `${ROOT}/${collection}/${id}` : `${ROOT}/${collection}`;
+}
+
+function readLocalDoc<T>(collection: string, id: string): T | null {
+    const doc = localFsReadDoc(localPath(collection, id));
+    if (!doc) return null;
+    const value = doc.value;
+    if (value === undefined || value === null) return null;
+    return value as T;
+}
+
+function writeLocalDoc<T>(collection: string, id: string, value: T): void {
+    localFsWriteField(
+        localPath(collection, id),
+        'value',
+        value as unknown as Record<string, unknown>
+    );
+}
+
+function deleteLocalDoc(collection: string, id: string): void {
+    localFsDeleteDoc(localPath(collection, id));
+}
+
+function listLocalDocs<T>(collection: string): T[] {
+    const ids = localFsListDocuments(localPath(collection));
+    return ids.map((id) => readLocalDoc<T>(collection, id)).filter((v): v is T => v !== null);
+}
+
+// ---------------- Generic CRUD ----------------
+
+async function setDoc<T>(collection: string, id: string, value: T): Promise<void> {
+    await withBackend(
+        async () => {
+            const redis = getRedis();
+            if (!redis) throw new Error('redis-missing');
+            await redis.set(redisKey(collection, id), JSON.stringify(value));
+            await redis.sadd(listKey(collection), id);
+        },
+        () => writeLocalDoc(collection, id, value)
+    );
+}
+
+async function getDoc<T>(collection: string, id: string): Promise<T | null> {
+    return withBackend<T | null>(
+        async () => {
+            const redis = getRedis();
+            if (!redis) throw new Error('redis-missing');
+            const raw = await redis.get(redisKey(collection, id));
+            if (!raw) return null;
+            if (typeof raw === 'string') return JSON.parse(raw) as T;
+            return raw as T;
+        },
+        () => readLocalDoc<T>(collection, id)
+    );
+}
+
+async function deleteDoc(collection: string, id: string): Promise<void> {
+    await withBackend(
+        async () => {
+            const redis = getRedis();
+            if (!redis) throw new Error('redis-missing');
+            await redis.del(redisKey(collection, id));
+            await redis.srem(listKey(collection), id);
+        },
+        () => deleteLocalDoc(collection, id)
+    );
+}
+
+async function listDocs<T>(collection: string): Promise<T[]> {
+    return withBackend<T[]>(
+        async () => {
+            const redis = getRedis();
+            if (!redis) throw new Error('redis-missing');
+            const ids = (await redis.smembers(listKey(collection))) as string[];
+            if (!ids.length) return [];
+            const values = await Promise.all(
+                ids.map(async (id) => {
+                    const raw = await redis.get(redisKey(collection, id));
+                    if (!raw) return null;
+                    if (typeof raw === 'string') return JSON.parse(raw) as T;
+                    return raw as T;
+                })
+            );
+            return values.filter((v): v is T => v !== null);
+        },
+        () => listLocalDocs<T>(collection)
+    );
+}
+
+// ---------------- Domain helpers ----------------
+
+export const yottalertStore = {
+    isPersistent(): boolean {
+        return isKVConfigured();
+    },
+
+    backend(): 'redis' | 'localfs' {
+        return isKVConfigured() ? 'redis' : 'localfs';
+    },
+
+    async saveAlertRule(rule: AlertRule): Promise<void> {
+        await setDoc('alert_rules', rule.id, rule);
+    },
+    async getAlertRule(id: string): Promise<AlertRule | null> {
+        return getDoc<AlertRule>('alert_rules', id);
+    },
+    async deleteAlertRule(id: string): Promise<void> {
+        await deleteDoc('alert_rules', id);
+    },
+    async listAlertRules(): Promise<AlertRule[]> {
+        return listDocs<AlertRule>('alert_rules');
+    },
+
+    async saveAlert(alert: YottalertAlert): Promise<void> {
+        await setDoc('alerts', alert.id, alert);
+    },
+    async getAlert(id: string): Promise<YottalertAlert | null> {
+        return getDoc<YottalertAlert>('alerts', id);
+    },
+    async listAlerts(): Promise<YottalertAlert[]> {
+        return listDocs<YottalertAlert>('alerts');
+    },
+    async deleteAlert(id: string): Promise<void> {
+        await deleteDoc('alerts', id);
+    },
+
+    async appendFeedback(feedback: AlertFeedback): Promise<void> {
+        await setDoc(`feedback:${feedback.alertId}`, feedback.id, feedback);
+    },
+    async listFeedback(alertId: string): Promise<AlertFeedback[]> {
+        return listDocs<AlertFeedback>(`feedback:${alertId}`);
+    },
+
+    async saveSyncRun(run: SyncRun): Promise<void> {
+        await setDoc('sync_runs', run.id, run);
+    },
+    async listSyncRuns(): Promise<SyncRun[]> {
+        return listDocs<SyncRun>('sync_runs');
+    },
+};
+
+export type YottalertStore = typeof yottalertStore;

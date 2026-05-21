@@ -16,6 +16,9 @@
         <!-- Spacer to center the title -->
         <v-spacer></v-spacer>
 
+        <!-- Elemental connection status pill -->
+        <ElementalStatusPill class="mr-2" />
+
         <!-- Settings Gear -->
         <v-tooltip :text="`Settings (${modKey}G)`">
             <template v-slot:activator="{ props: tooltipProps }">
