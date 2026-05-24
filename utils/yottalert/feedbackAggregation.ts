@@ -1,8 +1,8 @@
 import type {
     AlertFeedback,
     AlertFeedbackType,
-    RuleFeedbackSignal,
-    RuleSuppressionList,
+    WatchFeedbackSignal,
+    WatchSuppressionList,
     YottalertAlert,
 } from './types';
 
@@ -43,7 +43,7 @@ function capWithRecency(values: string[]): string[] {
 
 export function computeRuleFeedbackSignal(
     feedbackList: AlertFeedback[]
-): Omit<RuleFeedbackSignal, 'ruleId' | 'updatedAt'> {
+): Omit<WatchFeedbackSignal, 'watchAreaId' | 'updatedAt'> {
     const counts = emptyCounts();
     for (const item of feedbackList) {
         counts[item.feedbackType] = (counts[item.feedbackType] ?? 0) + 1;
@@ -80,12 +80,12 @@ export function computeRuleFeedbackSignal(
 }
 
 export function applyFeedbackToSuppressionList(
-    list: RuleSuppressionList | null | undefined,
+    list: WatchSuppressionList | null | undefined,
     alert: YottalertAlert,
     feedback: AlertFeedback
-): RuleSuppressionList {
-    const next: RuleSuppressionList = list ?? {
-        ruleId: alert.alertRuleId,
+): WatchSuppressionList {
+    const next: WatchSuppressionList = list ?? {
+        watchAreaId: alert.watchAreaId,
         suppressedEntityIds: [],
         suppressedGeographySlugs: [],
         boostedEntityIds: [],

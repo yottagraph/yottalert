@@ -4,21 +4,15 @@
  * can be imported from both client and server.
  */
 
-export type WatchTargetType =
-    | 'geography'
-    | 'entity'
-    | 'relationship'
-    | 'event_type'
-    | 'portfolio'
-    | 'natural_language';
+export type InterestKey =
+    | 'real_estate'
+    | 'public_safety'
+    | 'business'
+    | 'government'
+    | 'jobs'
+    | 'civic';
 
-export type DeliveryFrequency =
-    | 'as_it_happens'
-    | 'daily_digest'
-    | 'weekly_digest'
-    | 'dashboard_only';
-
-export type Sensitivity = 'low' | 'standard' | 'high';
+export type GeographyType = 'zip' | 'county';
 
 export type Severity = 'high' | 'medium' | 'low' | 'suppressed';
 
@@ -26,42 +20,16 @@ export type AlertStatus = 'new' | 'read' | 'archived' | 'suppressed';
 
 export type ProvenanceStatus = 'complete' | 'partial' | 'unavailable';
 
-export interface GeographyConstraint {
-    name: string;
-    type?: string;
-    slug?: string;
-}
-
-export interface StructuredRule {
-    watchTargetType: WatchTargetType;
-    watchTargetValue: string;
-    geography?: GeographyConstraint;
-    entityRefs?: Array<{ neid?: string; name: string }>;
-    eventCategories: string[];
-    entityTypes: string[];
-    relationshipTypes: string[];
-    geographyConstraints?: GeographyConstraint[];
-    timeWindow: string;
-    sensitivity: Sensitivity;
-    minimumConfidence: number;
-    exclusions: string[];
-}
-
-export interface AlertRule {
+export interface WatchArea {
     id: string;
-    organizationId: string;
     userId: string;
-    name: string;
-    naturalLanguagePrompt: string;
-    structuredRule: StructuredRule;
-    watchTargetType: WatchTargetType;
-    frequency: DeliveryFrequency;
+    geographyType: GeographyType;
+    geographyCode: string;
+    geographyLabel: string;
+    geographyNeid?: string;
+    interests: InterestKey[];
     minimumConfidence: number;
-    sensitivity: Sensitivity;
-    deliveryDestination: string;
-    enabled: boolean;
     lastCheckedAt?: string;
-    lastElementalCursor?: string;
     lastSeenEntityIds: string[];
     lastSeenRelationshipIds: string[];
     lastSeenEventIds: string[];
@@ -105,6 +73,16 @@ export interface AlertEventRef {
     geography?: string;
     occurredAt?: string;
     confidence: number;
+    source: 'elemental' | 'synthetic';
+    status?: 'observed' | 'predicted' | 'historical';
+    publication?: { name: string; url?: string };
+    url?: string;
+    sentiment?: number;
+    sentimentReasoning?: string;
+    tone?: 'opinionated' | 'matter-of-fact';
+    titleFactuality?: 'sensational' | 'factual';
+    actors?: Array<{ neid: string; name: string; sentiment?: number }>;
+    rawValues?: Record<string, string | number | null>;
 }
 
 export interface AlertRelationshipRef {
@@ -117,7 +95,7 @@ export interface AlertRelationshipRef {
 
 export interface YottalertAlert {
     id: string;
-    alertRuleId: string;
+    watchAreaId: string;
     title: string;
     summary: string;
     whyItMatters: string;
@@ -165,8 +143,8 @@ export interface AlertFeedback {
     createdAt: string;
 }
 
-export interface RuleFeedbackSignal {
-    ruleId: string;
+export interface WatchFeedbackSignal {
+    watchAreaId: string;
     totalFeedback: number;
     counts: Record<AlertFeedbackType, number>;
     utilityScore: number;
@@ -175,8 +153,8 @@ export interface RuleFeedbackSignal {
     updatedAt: string;
 }
 
-export interface RuleSuppressionList {
-    ruleId: string;
+export interface WatchSuppressionList {
+    watchAreaId: string;
     suppressedEntityIds: string[];
     suppressedGeographySlugs: string[];
     boostedEntityIds: string[];
@@ -207,7 +185,7 @@ export interface ProvenanceRecord {
 export interface SyncRun {
     id: string;
     organizationId: string;
-    alertRuleId: string;
+    watchAreaId: string;
     status: 'queued' | 'running' | 'completed' | 'failed';
     startedAt: string;
     completedAt?: string;
@@ -233,6 +211,13 @@ export interface AgentStepDescriptor {
     color: string;
     workingText: string;
     completedText: string;
+}
+
+export interface GeographySearchResult {
+    neid?: string;
+    name: string;
+    geographyType: GeographyType;
+    code: string;
 }
 
 export const YOTTALERT_AGENT_STEPS: AgentStepDescriptor[] = [

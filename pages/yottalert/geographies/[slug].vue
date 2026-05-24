@@ -5,8 +5,7 @@
                 <span class="kicker">GEOGRAPHY CONTEXT</span>
                 <h1 class="page-title">{{ humanName }}</h1>
                 <p class="page-subtitle">
-                    {{ alertsForGeo.length }} alert{{ alertsForGeo.length === 1 ? '' : 's' }} ·
-                    {{ rulesForGeo.length }} watched rule{{ rulesForGeo.length === 1 ? '' : 's' }}
+                    {{ alertsForGeo.length }} alert{{ alertsForGeo.length === 1 ? '' : 's' }}
                 </p>
             </header>
 
@@ -15,29 +14,7 @@
                 <div v-if="alertsForGeo.length" class="alert-grid">
                     <AlertCard v-for="a in alertsForGeo" :key="a.id" :alert="a" />
                 </div>
-                <div v-else class="empty-block">
-                    No alerts yet for this geography — try the
-                    <NuxtLink to="/yottalert/alerts/new">alert builder</NuxtLink>.
-                </div>
-            </section>
-
-            <section class="block">
-                <h2 class="section-title">Watched rules</h2>
-                <div v-if="rulesForGeo.length" class="rule-list">
-                    <NuxtLink
-                        v-for="r in rulesForGeo"
-                        :key="r.id"
-                        :to="`/yottalert/alerts/new?ruleId=${r.id}`"
-                        class="rule-card"
-                    >
-                        <div class="rule-name">{{ r.name }}</div>
-                        <div class="rule-meta">
-                            {{ r.frequency }} · {{ r.sensitivity }} · min
-                            {{ r.minimumConfidence.toFixed(2) }}
-                        </div>
-                    </NuxtLink>
-                </div>
-                <div v-else class="empty-block">No rules currently target this geography.</div>
+                <div v-else class="empty-block">No alerts yet for this geography.</div>
             </section>
 
             <section class="block">
@@ -64,7 +41,7 @@
     definePageMeta({ layout: false });
 
     const route = useRoute();
-    const { alerts, rules, refreshAll } = useYottalert();
+    const { alerts, refreshAll } = useYottalert();
 
     const slug = computed(() => String(route.params.slug || ''));
     const humanName = computed(() =>
@@ -86,13 +63,6 @@
 
     const alertsForGeo = computed(() =>
         alerts.value.filter((a) => a.geographyLabel && slugify(a.geographyLabel) === slug.value)
-    );
-    const rulesForGeo = computed(() =>
-        rules.value.filter(
-            (r) =>
-                r.structuredRule.geography?.name &&
-                slugify(r.structuredRule.geography.name) === slug.value
-        )
     );
     const entitiesHere = computed(() => {
         const counts = new Map<string, number>();
@@ -151,30 +121,6 @@
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
         gap: 12px;
-    }
-    .rule-list {
-        display: grid;
-        gap: 8px;
-    }
-    .rule-card {
-        background: rgba(255, 255, 255, 0.03);
-        border-radius: 8px;
-        padding: 10px 12px;
-        text-decoration: none;
-        color: inherit;
-    }
-    .rule-card:hover {
-        background: rgba(255, 255, 255, 0.07);
-    }
-    .rule-name {
-        font-size: 13px;
-        font-weight: 600;
-    }
-    .rule-meta {
-        font-family: var(--font-mono);
-        font-size: 11px;
-        color: rgba(255, 255, 255, 0.55);
-        margin-top: 2px;
     }
     .chips {
         display: flex;

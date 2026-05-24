@@ -16,36 +16,18 @@
                     </NuxtLink>
                 </div>
 
-                <div v-if="activeRules.length" class="sidebar-section">
-                    <div class="section-label">Active rules</div>
-                    <NuxtLink
-                        v-for="rule in activeRules"
-                        :key="rule.id"
-                        :to="`/yottalert/alerts/new?ruleId=${rule.id}`"
-                        class="nav-link nav-link-compact"
-                    >
-                        <span class="sev-dot" :class="`sev-${ruleSeverity(rule.id)}`" />
-                        <span class="rule-name">{{ rule.name }}</span>
-                    </NuxtLink>
-                </div>
-
-                <div v-if="watchedGeographies.length" class="sidebar-section">
-                    <div class="section-label">Watchlists</div>
-                    <NuxtLink
-                        v-for="geo in watchedGeographies.slice(0, 6)"
-                        :key="geo.name"
-                        :to="`/yottalert/geographies/${slugify(geo.name)}`"
-                        class="nav-link nav-link-compact"
-                    >
-                        <v-icon icon="mdi-map-marker-outline" size="12" class="nav-icon" />
-                        <span class="rule-name">{{ geo.name }}</span>
-                        <span class="rule-count">{{ geo.count }}</span>
-                    </NuxtLink>
-                </div>
-
                 <div class="sidebar-footer">
+                    <div class="footer-line">{{ alertCount }} alerts</div>
                     <div class="footer-line">
-                        {{ alertCount }} alerts · {{ activeRules.length }} rules
+                        Current watch:
+                        <span class="watch-name">
+                            {{ watchArea?.geographyLabel ?? 'not set' }}
+                        </span>
+                    </div>
+                    <div class="footer-line">
+                        <NuxtLink to="/yottalert/onboarding" class="change-link">
+                            Change area
+                        </NuxtLink>
                     </div>
                     <div class="footer-line muted">
                         Store: {{ backend === 'redis' ? 'KV' : 'local-fs' }}
@@ -70,7 +52,7 @@
     import { useYottalert } from '~/composables/useYottalert';
 
     const route = useRoute();
-    const { rules, alerts, watchedGeographies, backend, refreshAll } = useYottalert();
+    const { watchArea, alerts, backend, refreshAll } = useYottalert();
 
     onMounted(() => {
         refreshAll();
@@ -78,12 +60,10 @@
 
     const navItems = [
         { to: '/yottalert', label: 'Dashboard', icon: 'mdi-view-dashboard-outline' },
-        { to: '/yottalert/alerts/new', label: 'Alert Builder', icon: 'mdi-plus-box-outline' },
         { to: '/yottalert/digest', label: 'Digest', icon: 'mdi-file-document-outline' },
         { to: '/yottalert/settings/elemental', label: 'Settings', icon: 'mdi-cog-outline' },
     ];
 
-    const activeRules = computed(() => rules.value.filter((r) => r.enabled).slice(0, 5));
     const alertCount = computed(() => alerts.value.length);
 
     function isActive(item: { to: string }): boolean {
@@ -91,21 +71,6 @@
             return route.path === '/yottalert' || route.path === '/yottalert/';
         }
         return route.path.startsWith(item.to);
-    }
-
-    function ruleSeverity(ruleId: string): string {
-        const ruleAlerts = alerts.value.filter((a) => a.alertRuleId === ruleId);
-        if (ruleAlerts.some((a) => a.severity === 'high')) return 'high';
-        if (ruleAlerts.some((a) => a.severity === 'medium')) return 'medium';
-        if (ruleAlerts.some((a) => a.severity === 'low')) return 'low';
-        return 'suppressed';
-    }
-
-    function slugify(s: string): string {
-        return s
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-+|-+$/g, '');
     }
 </script>
 
@@ -164,10 +129,6 @@
     .nav-link.active .nav-icon {
         color: var(--lv-green);
     }
-    .nav-link-compact {
-        font-size: 12px;
-        padding: 4px 16px;
-    }
     .nav-icon {
         color: rgba(255, 255, 255, 0.6);
     }
@@ -176,29 +137,6 @@
         text-overflow: ellipsis;
         white-space: nowrap;
         flex: 1;
-    }
-    .rule-count {
-        font-family: var(--font-mono);
-        font-size: 10px;
-        color: rgba(255, 255, 255, 0.5);
-    }
-    .sev-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 999px;
-        flex-shrink: 0;
-    }
-    .sev-high {
-        background: var(--dynamic-severity-high);
-    }
-    .sev-medium {
-        background: var(--dynamic-severity-medium);
-    }
-    .sev-low {
-        background: var(--dynamic-severity-low);
-    }
-    .sev-suppressed {
-        background: var(--dynamic-severity-suppressed);
     }
     .sidebar-footer {
         margin-top: auto;
@@ -213,6 +151,13 @@
     }
     .footer-line.muted {
         color: rgba(255, 255, 255, 0.35);
+    }
+    .watch-name {
+        color: rgba(255, 255, 255, 0.9);
+    }
+    .change-link {
+        color: var(--lv-green);
+        text-decoration: none;
     }
     .yottalert-content {
         flex: 1;

@@ -32,18 +32,18 @@ export default defineEventHandler(async (event) => {
     };
     await yottalertStore.appendFeedback(feedback);
 
-    const feedbackForRule = await yottalertStore.listFeedbackForRule(alert.alertRuleId);
-    const computed = computeRuleFeedbackSignal(feedbackForRule);
+    const feedbackForWatchArea = await yottalertStore.listFeedbackForWatchArea(alert.watchAreaId);
+    const computed = computeRuleFeedbackSignal(feedbackForWatchArea);
     const signal = {
-        ruleId: alert.alertRuleId,
+        watchAreaId: alert.watchAreaId,
         ...computed,
         updatedAt: new Date().toISOString(),
     };
-    await yottalertStore.saveRuleFeedbackSignal(signal);
+    await yottalertStore.saveWatchFeedbackSignal(signal);
 
-    const existingSuppression = await yottalertStore.getRuleSuppressionList(alert.alertRuleId);
+    const existingSuppression = await yottalertStore.getWatchSuppressionList(alert.watchAreaId);
     const suppression = applyFeedbackToSuppressionList(existingSuppression, alert, feedback);
-    await yottalertStore.saveRuleSuppressionList(suppression);
+    await yottalertStore.saveWatchSuppressionList(suppression);
 
     return { feedback, signal, suppression };
 });

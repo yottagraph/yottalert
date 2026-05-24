@@ -8,17 +8,17 @@
  */
 
 import type {
-    AlertRule,
-    RuleFeedbackSignal,
-    RuleSuppressionList,
     ScoreBreakdown,
     Severity,
+    WatchArea,
+    WatchFeedbackSignal,
+    WatchSuppressionList,
     YottalertAlert,
 } from '~/utils/yottalert/types';
 import { severityForScore } from '~/utils/yottalert/severity';
 
 interface ScoreInputs {
-    rule: AlertRule;
+    watchArea: WatchArea;
     candidate: Pick<
         YottalertAlert,
         | 'confidence'
@@ -28,7 +28,7 @@ interface ScoreInputs {
         | 'elementalRelationshipIds'
         | 'geographyLabel'
     > & { isNew?: boolean; recencyMinutes?: number };
-    suppression?: RuleSuppressionList | null;
+    suppression?: WatchSuppressionList | null;
 }
 
 function clamp01(n: number): number {
@@ -37,9 +37,9 @@ function clamp01(n: number): number {
 }
 
 function relevance(inputs: ScoreInputs): number {
-    const { rule, candidate } = inputs;
+    const { watchArea, candidate } = inputs;
     const matches =
-        Number(Boolean(candidate.geographyLabel && rule.structuredRule.geography?.name)) +
+        Number(Boolean(candidate.geographyLabel && watchArea.geographyLabel)) +
         Number(candidate.elementalEntityIds.length > 0) +
         Number(candidate.elementalEventIds.length > 0) +
         Number(candidate.elementalRelationshipIds.length > 0);
@@ -60,9 +60,9 @@ function relevance(inputs: ScoreInputs): number {
 }
 
 function novelty(inputs: ScoreInputs): number {
-    const { candidate, rule } = inputs;
+    const { candidate, watchArea } = inputs;
     if (candidate.isNew === false) return 0.4;
-    const lastCheck = rule.lastCheckedAt ? new Date(rule.lastCheckedAt).getTime() : null;
+    const lastCheck = watchArea.lastCheckedAt ? new Date(watchArea.lastCheckedAt).getTime() : null;
     if (!lastCheck) return 0.85;
     const ageHours = (Date.now() - lastCheck) / 3_600_000;
     return clamp01(0.5 + Math.min(0.5, ageHours / 48));
@@ -70,10 +70,10 @@ function novelty(inputs: ScoreInputs): number {
 
 function localSignificance(inputs: ScoreInputs): number {
     const hasGeo = Boolean(inputs.candidate.geographyLabel);
-    const ruleHasGeo = Boolean(inputs.rule.structuredRule.geography?.name);
-    if (hasGeo && ruleHasGeo) return 0.9;
+    const watchHasGeo = Boolean(inputs.watchArea.geographyLabel);
+    if (hasGeo && watchHasGeo) return 0.9;
     if (hasGeo) return 0.75;
-    if (ruleHasGeo) return 0.55;
+    if (watchHasGeo) return 0.55;
     return 0.5;
 }
 
@@ -132,7 +132,7 @@ function clamp(n: number, min: number, max: number): number {
 
 export function applyFeedbackAdjustment(
     result: ScoreResult,
-    signal?: RuleFeedbackSignal | null
+    signal?: WatchFeedbackSignal | null
 ): ScoreResult {
     if (!signal || signal.totalFeedback === 0) return result;
     const utility = (signal.utilityScore - signal.noiseScore) * 0.25;

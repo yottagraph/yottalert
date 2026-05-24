@@ -3,8 +3,13 @@
         <main class="dashboard">
             <header class="page-head">
                 <span class="kicker">YOTTALERT</span>
-                <h1 class="page-title">Watch overview</h1>
-                <p class="page-subtitle">Live Elemental context · {{ alertSummary }}</p>
+                <h1 class="page-title">
+                    {{ watchArea ? `Watching ${watchArea.geographyLabel}` : 'Watch overview' }}
+                </h1>
+                <p class="page-subtitle">
+                    Live Elemental context · {{ alertSummary }}
+                    <NuxtLink to="/yottalert/onboarding" class="change-link">Change area</NuxtLink>
+                </p>
             </header>
 
             <StatusStrip />
@@ -12,9 +17,15 @@
             <section class="section">
                 <div class="section-head">
                     <h2 class="section-title">High-priority alerts</h2>
-                    <NuxtLink to="/yottalert/alerts/new" class="link"
-                        ><v-icon icon="mdi-plus" size="14" /> New rule</NuxtLink
+                    <v-btn
+                        size="small"
+                        variant="outlined"
+                        prepend-icon="mdi-refresh"
+                        :loading="runningCheckNow"
+                        @click="checkNow"
                     >
+                        Check now
+                    </v-btn>
                 </div>
                 <div v-if="alertsLoading" class="loader">
                     <v-progress-circular indeterminate size="24" />
@@ -30,11 +41,11 @@
                     </div>
                     <v-btn
                         color="primary"
-                        to="/yottalert/alerts/new"
+                        to="/yottalert/onboarding"
                         class="mt-3"
-                        prepend-icon="mdi-plus"
+                        prepend-icon="mdi-map-marker-radius-outline"
                     >
-                        Create your first rule
+                        Set your watch area
                     </v-btn>
                 </div>
             </section>
@@ -54,67 +65,22 @@
                     </div>
                 </div>
             </section>
-
-            <section class="two-col">
-                <div class="section">
-                    <h2 class="section-title">Watched geographies</h2>
-                    <div v-if="watchedGeographies.length" class="chips">
-                        <NuxtLink
-                            v-for="g in watchedGeographies"
-                            :key="g.name"
-                            :to="`/yottalert/geographies/${slugify(g.name)}`"
-                            class="cloud-chip"
-                        >
-                            <v-icon icon="mdi-map-marker-outline" size="12" />
-                            <span>{{ g.name }}</span>
-                            <span class="count">{{ g.count }}</span>
-                        </NuxtLink>
-                    </div>
-                    <div v-else class="empty-text small">
-                        Geography mentions in your alert rules will appear here.
-                    </div>
-                </div>
-
-                <div class="section">
-                    <h2 class="section-title">Watched entities</h2>
-                    <div v-if="watchedEntities.length" class="chips">
-                        <span
-                            v-for="e in watchedEntities.slice(0, 20)"
-                            :key="e.name"
-                            class="cloud-chip"
-                        >
-                            <v-icon icon="mdi-office-building-outline" size="12" />
-                            <span>{{ e.name }}</span>
-                            <span class="count">{{ e.count }}</span>
-                        </span>
-                    </div>
-                    <div v-else class="empty-text small">
-                        Entities surfaced by your alerts will appear here.
-                    </div>
-                </div>
-            </section>
         </main>
     </YottalertShell>
 </template>
 
 <script setup lang="ts">
-    import { computed, onMounted } from 'vue';
+    import { computed, onMounted, ref } from 'vue';
 
     import { useElementalStatus } from '~/composables/useElementalStatus';
     import { useYottalert } from '~/composables/useYottalert';
 
     definePageMeta({ layout: false });
 
-    const {
-        alerts,
-        highSeverity,
-        recent,
-        watchedGeographies,
-        watchedEntities,
-        alertsLoading,
-        refreshAll,
-    } = useYottalert();
+    const { watchArea, alerts, highSeverity, recent, alertsLoading, refreshAll, runCheckNow } =
+        useYottalert();
     const { refresh: refreshStatus } = useElementalStatus();
+    const runningCheckNow = ref(false);
 
     onMounted(() => {
         refreshAll();
@@ -127,11 +93,13 @@
         return `${high} high · ${med} medium · ${alerts.value.length} total`;
     });
 
-    function slugify(s: string): string {
-        return s
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-+|-+$/g, '');
+    async function checkNow() {
+        runningCheckNow.value = true;
+        try {
+            await runCheckNow();
+        } finally {
+            runningCheckNow.value = false;
+        }
     }
 </script>
 
@@ -178,17 +146,6 @@
         font-size: 1.15rem;
         letter-spacing: 0.02em;
     }
-    .link {
-        font-family: var(--font-mono);
-        font-size: 11px;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        color: var(--lv-green);
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-    }
     .muted {
         font-family: var(--font-mono);
         font-size: 10px;
@@ -230,40 +187,11 @@
         display: flex;
         justify-content: center;
     }
-    .two-col {
-        display: grid;
-        gap: 24px;
-        grid-template-columns: 1fr 1fr;
-    }
-    @media (max-width: 900px) {
-        .two-col {
-            grid-template-columns: 1fr;
-        }
-    }
-    .chips {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-    .cloud-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 5px 10px;
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 999px;
-        text-decoration: none;
-        color: rgba(255, 255, 255, 0.85);
-        font-size: 12px;
-    }
-    .cloud-chip:hover {
-        background: rgba(255, 255, 255, 0.1);
-    }
-    .count {
-        font-family: var(--font-mono);
-        font-size: 10px;
+    .change-link {
+        margin-left: 10px;
         color: var(--lv-green);
-        padding-left: 4px;
+        text-decoration: none;
+        font-family: var(--font-mono);
+        font-size: 11px;
     }
 </style>

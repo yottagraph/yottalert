@@ -6,9 +6,9 @@ Build a web application called Yottalert. Tagline: "Context-aware alerts from th
 
 Implement the three-pane shell (app.vue + AppHeader.vue + YottalertShell.vue) following the Wealth Atlas blueprint: pinned header, persistent 184px dark sidebar (sidebar background hard-coded as --lv-sidebar-bg, does not theme), and a single scrollable main panel. Apply the --dynamic-\* token system via useLovelaceTheme() with five presets (lovelace-dark, lovelace-light, paper, bloomberg, slate). Hide body scrolling; scroll lives inside YottalertShell.
 
-Create services: elementalMcpClient.ts, elementalApiClient.ts, watchRuleInterpreter.ts, changeDetectionService.ts, alertScoringService.ts, alertExplanationService.ts, provenanceService.ts, syncScheduler.ts, digestService.ts. The MCP client must expose stable Yottalert function names even if Elemental tool names change. Never invoke MCP from the browser.
+Create services: elementalMcpClient.ts, elementalApiClient.ts, changeDetectionService.ts, alertScoringService.ts, alertExplanationService.ts, provenanceService.ts, syncScheduler.ts, digestService.ts. The MCP client must expose stable Yottalert function names even if Elemental tool names change. Never invoke MCP from the browser.
 
-Build screens: Dashboard, Alert Builder, Alert Detail, Entity Context Drawer, Geography Context Page, Provenance View, Elemental Connection Settings. The Alert Builder always calls resolveUserWatchQuery() and shows the editable structured interpretation before save. The Alert Detail page answers what happened / why it matters / what changed / who-where / evidence / confidence / next step, with a 6-component score breakdown and a feedback bar (Useful · Not relevant · Duplicate · Wrong location · Wrong entity · Too noisy · Too late · Increase sensitivity · Decrease sensitivity · Add similar · Suppress similar).
+Build screens: Dashboard, Watch Area Onboarding, Alert Detail, Entity Context Drawer, Geography Context Page, Provenance View, Elemental Connection Settings. Onboarding is now ZIP/county first: set one watch area, pick 2-5 interests, then monitor important alerts for that area. The Alert Detail page answers what happened / why it matters / what changed / who-where / evidence / confidence / next step, with a 6-component score breakdown and a feedback bar (Useful · Not relevant · Duplicate · Wrong location · Wrong entity · Too noisy · Too late · Increase sensitivity · Decrease sensitivity · Add similar · Suppress similar).
 
 Use the Wealth Atlas agent UX for live workflow surfaces: SSE through /api/agent/[engineId]/stream, live step card under the in-flight bubble with AgentSteps (6-step Yottalert taxonomy: Dialogue → Watch Resolution → Graph Retrieval → Change Detection → Scoring → Composition), requestAnimationFrame typewriter at ~840 chars/sec, post-completion AgentMetaBar with model, tokens, cost, and feedback. Fall back to a deterministic Nitro endpoint when the ADK agent is unavailable.
 
@@ -180,7 +180,7 @@ Each component is computed from Elemental data where possible (centrality, sourc
 5.8 Alert Object
 type YottalertAlert = {
 id: string;
-alertRuleId: string;
+watchAreaId: string;
 elementalObjectIds: string[];
 elementalEntityIds: string[];
 elementalEventIds: string[];
@@ -214,21 +214,20 @@ Every alert must show: source document/item, source URL or identifier, ingestion
    id, name, created_at
    elemental_connections
    id, organization_id, connection_name, mcp_server_url, api_base_url, auth_type, encrypted_credentials_ref, status, last_checked_at, created_at
-   alert_rules
-   id, organization_id, user_id, name, natural_language_prompt, structured_rule_json, watch_target_type, frequency, minimum_confidence, sensitivity, delivery_destination, enabled, last_checked_at, last_elemental_cursor, created_at, updated_at
+   watch_areas
+   id, user_id, geography_type, geography_code, geography_label, geography_neid, interests_json, minimum_confidence, last_checked_at, created_at, updated_at
    alerts
-   id, organization_id, alert_rule_id, title, summary, why_it_matters, what_changed, suggested_next_step, severity, score, score_breakdown_json, confidence, elemental_object_refs_json, source_count, provenance_status, status, created_at
+   id, organization_id, watch_area_id, title, summary, why_it_matters, what_changed, suggested_next_step, severity, score, score_breakdown_json, confidence, elemental_object_refs_json, source_count, provenance_status, status, created_at
    alert_evidence_refs
    id, alert_id, elemental_source_id, elemental_object_id, evidence_type, display_text, confidence, created_at
    alert_feedback
    id, alert_id, user_id, feedback_type, comment, created_at
    sync_runs
-   id, organization_id, alert_rule_id, status, started_at, completed_at, objects_checked, candidate_alerts_created, errors_json
+   id, organization_id, watch_area_id, status, started_at, completed_at, objects_checked, candidate_alerts_created, errors_json
 7. Backend Services
    /services/elementalMcpClient.ts // MCP wrapper, stable function surface
    /services/elementalApiClient.ts // Typed API client
-   /services/watchRuleInterpreter.ts // NL → structured rule via Elemental
-   /services/changeDetectionService.ts // Per-rule sync diff
+   /services/changeDetectionService.ts // Watch-area sync diff
    /services/alertScoringService.ts // 6-factor score
    /services/alertExplanationService.ts // Composes title/summary/whyItMatters/whatChanged/nextStep
    /services/provenanceService.ts // Source + confidence rollup
@@ -238,13 +237,11 @@ Every alert must show: source document/item, source URL or identifier, ingestion
    GET /api/health
    GET /api/elemental/status
    POST /api/elemental/test-connection
-   GET /api/alert-rules
-   POST /api/alert-rules
-   GET /api/alert-rules/:id
-   PATCH /api/alert-rules/:id
-   DELETE /api/alert-rules/:id
-   POST /api/alert-rules/interpret
-   POST /api/alert-rules/:id/check-now
+   GET /api/watch-area
+   POST /api/watch-area
+   PATCH /api/watch-area
+   POST /api/watch-area/check-now
+   GET /api/geographies/search
    GET /api/alerts
    GET /api/alerts/:id
    PATCH /api/alerts/:id/status
@@ -326,11 +323,9 @@ Yottalert's sidebar sections:
 
 Section Items
 Navigation
-Dashboard · Alerts · Alert Builder · Entities · Geographies · Digest · Settings
-Watchlists
-(pinned user watchlists)
-Active rules
-(top 5 enabled rules with severity dot)
+Dashboard · Digest · Settings
+Current watch
+(single ZIP/county watch area with change shortcut)
 Recent sync runs
 (last 5 with status dot + relative time)
 Active link uses rgba(63, 234, 0, 0.16) background with HSL primary text — intentionally hard-coded cyber-green even on non-Lovelace presets (sidebar = brand chrome).
@@ -455,30 +450,20 @@ Score chip (top-right) — mdi-meter icon + integer score on rgba(--dynamic-prim
 13px one-sentence summary.
 12px italic muted "Why it matters" (one line, truncated).
 Footer row: source count chip (mdi-source-branch), confidence chip (e.g. 87%), relative time (e.g. 12m ago).
-9.5.2 Alert Builder (/yottalert/alerts/new and /yottalert/alerts/:id/edit)
-Layout: two-column on lg+, stacked on md-:
+9.5.2 Watch Area Onboarding (/yottalert/onboarding)
+Layout: single centered card with two steps:
 
-Left column — input:
+Step 1 — geography selection:
 
-Natural-language prompt — multiline v-textarea, autosize, placeholder "Monitor Downtown Pittsburgh for commercial real estate stress.".
-Interpret button (calls /api/alert-rules/interpret).
-Watch target selector — v-btn-toggle over geography | entity | relationship | event_type | portfolio | natural_language.
-Geography selector (autocomplete; resolves through Elemental).
-Entity selector (autocomplete).
-Event-category multi-select.
-Relationship-type multi-select.
-Sensitivity slider (Low | Standard | High).
-Minimum-confidence slider (0.0 – 1.0, default 0.7).
-Frequency v-radio-group: As it happens | Daily digest | Weekly digest | Dashboard only.
-Delivery destination (email / dashboard only / Slack channel / webhook).
-Exclusions multi-input.
-Save alert + Check now buttons.
-Right column — structured interpretation preview (sticky on lg+):
+ZIP/county search input backed by `/api/yottalert/geographies/search`.
+User picks one geography result that resolves to `{ geographyType, geographyCode, geographyLabel, geographyNeid }`.
 
-Renders the resolved structured_rule_json as a labeled JSON view.
-"Edit" pencil on each block opens an inline field editor.
-Live agent workflow card streams beneath while interpretation is running (see §9.6).
-The builder always calls resolveUserWatchQuery() and shows the structured interpretation before save.
+Step 2 — interest chips:
+
+User selects 2-5 chips from: Real estate, Public safety, Business, Government, Jobs, Civic news.
+Submit stores the watch area via `POST /api/yottalert/watch-area`, then triggers `POST /api/yottalert/watch-area/check-now`.
+
+The dashboard and sidebar always reflect this single active watch area.
 
 9.5.3 Alert Detail Page (/yottalert/alerts/:id)
 Answers, in order: What happened? Why does it matter? What changed? Who/where? What evidence? How confident? What next?
@@ -669,12 +654,12 @@ Agent-error surface for streaming runs uses the Wealth Atlas pattern: red-tinted
     All Elemental object access logged (user, time, object ID, tool/endpoint).
     All natural-language watch queries logged for auditability.
     No untrusted tool output rendered as executable HTML (markdown rendering uses the inline-friendly renderer described in 2026-05-20_ui_prd.md §4.4; if fenced code or tables become needed, swap to marked + DOMPurify).
-    Rate limiting on /api/sync/_ and /api/alert-rules/interpret.
+    Rate limiting on /api/sync/_ and /api/watch-area/\*.
     Organization-level Elemental connection settings (users inherit credentials from their org).
 12. Build Priority
     Elemental connection settings page + elementalMcpClient.ts + elementalApiClient.ts.
-    Alert-rule schema + database migrations.
-    Alert Builder with natural-language interpretation (live agent steps for the resolver call).
+    Watch-area schema + database migrations.
+    ZIP/county onboarding with interest chips.
     Manual Check now workflow + sync-run record.
     changeDetectionService.ts + alertScoringService.ts.
     Dashboard.
@@ -699,56 +684,16 @@ Digest contains no number absent from the deterministic data context and no [N] 
 
 ## Status
 
-MVP scaffolded. See `design/requirements.md` for the prioritized
-MVP/P1/P2 breakdown extracted from this brief and the running
-implementation checklist.
+The product now uses a ZIP/county-first watch area model. Users configure a single area and interest chips, then receive ranked alerts for that area. The prior free-form Alert Builder and `alert-rules` API surface have been removed from the running implementation.
 
 ## Modules
 
-- **Three-pane shell** — `components/AppHeader.vue` (with new
-  `ElementalStatusPill`) + `components/yottalert/YottalertShell.vue`
-  (persistent 184px dark sidebar) + `YottalertProvenanceFooter`.
-  Severity tokens (`--dynamic-severity-*`) and sidebar tokens added to
-  `assets/brand-globals.css`.
-- **Dashboard** — `pages/yottalert/index.vue` with `StatusStrip`,
-  high-priority alert grid, recent alerts list, watched-geographies
-  and watched-entities chip clouds. Empty states wired everywhere.
-- **Alert Builder** — `pages/yottalert/alerts/new.vue`. Natural-language
-  prompt → `/api/yottalert/alert-rules/interpret` → editable
-  `StructuredRulePreview` → save + Check now.
-- **Alert Detail** — `pages/yottalert/alerts/[id].vue`. Score
-  breakdown, summary block, entity/event/relationship sections,
-  evidence + provenance, sticky `AlertFeedbackBar`.
-- **Entity Context Drawer** — `components/yottalert/EntityContextDrawer.vue`,
-  opens from any entity chip on the detail page.
-- **Geography page** — `pages/yottalert/geographies/[slug].vue`.
-- **Digest** — `pages/yottalert/digest.vue` backed by the
-  deterministic composer in `server/services/digestService.ts`. Source
-  chip flips to green when Gemini is later wired up.
-- **Elemental Connection Settings** — `pages/yottalert/settings/elemental.vue`
-  with live status panel + stable MCP surface table.
-- **Server services** — `server/services/`:
-    - `elementalApiClient.ts` — typed REST wrapper over the portal
-      gateway (no GCP credentials in the app).
-    - `elementalMcpClient.ts` — Yottalert's stable MCP surface
-      (degrades to REST when the MCP server is unreachable).
-    - `watchRuleInterpreter.ts` — deterministic NL → structured rule.
-    - `changeDetectionService.ts` — per-rule candidate synthesis,
-      uses real Elemental entities when reachable.
-    - `alertScoringService.ts` — 6-component score (geometric mean × 100).
-    - `alertExplanationService.ts` — title/summary/why/what/next.
-    - `provenanceService.ts` — confidence + status rollup.
-    - `syncScheduler.ts` — `runSyncForRule()` (manual + future cron).
-    - `digestService.ts` — deterministic Gemini-style brief.
-    - `yottalertStore.ts` — KV (Upstash) or local-FS fallback for
-      rules / alerts / feedback / sync runs. Stores Elemental object
-      IDs only.
-- **API routes** — under `server/api/yottalert/`:
-    - `alert-rules` (CRUD + interpret + check-now)
-    - `alerts` (list, detail, status, feedback)
-    - `elemental/status` + `elemental/test-connection`
-    - `entities/search` (proxies entity autocomplete to the gateway)
-    - `digest/daily`
+- **Three-pane shell** — `components/AppHeader.vue` + `components/yottalert/YottalertShell.vue` + `YottalertProvenanceFooter`, with a slim nav (`Dashboard`, `Digest`, `Settings`) and current-watch footer.
+- **Watch Area Onboarding** — `pages/yottalert/onboarding.vue`, backed by `/api/yottalert/geographies/search` and `/api/yottalert/watch-area`, then immediate `/api/yottalert/watch-area/check-now`.
+- **Dashboard** — `pages/yottalert/index.vue` shows the active watch area, status strip, high-priority cards, and recent alerts.
+- **Alert Detail** — `pages/yottalert/alerts/[id].vue` keeps score breakdown, evidence/provenance, and feedback.
+- **Server services** — `changeDetectionService.ts` now consumes `WatchArea` + interest chips; `syncScheduler.ts` runs `runSyncForWatchArea()`; `yottalertStore.ts` persists one watch area per user plus alerts/feedback/sync runs.
+- **API routes** — `watch-area` (get/post/patch/check-now), `geographies/search`, `alerts`, `digest/daily`, and Elemental status/connection routes.
 - **Composables** — `useElementalStatus`, `useYottalert`.
 
 ## Roadmap (P1/P2)

@@ -1,20 +1,20 @@
 /**
  * Sync runner (PRD §7 / §12 step 4 + step 11).
  *
- * `runSyncForRule()` is called by the manual `POST /api/yottalert/alert-rules/:id/check-now`
+ * `runSyncForWatchArea()` is called by the manual `POST /api/yottalert/watch-area/check-now`
  * route today; a cron-driven sweep can call `runScheduledSync()` later.
  *
  * Each run:
  *   1. Records a `SyncRun` row.
  *   2. Calls `changeDetectionService.detectChanges()`.
- *   3. Filters candidates below the rule's `minimumConfidence`.
+ *   3. Filters candidates below the watch area's `minimumConfidence`.
  *   4. Scores survivors via `alertScoringService`.
  *   5. Composes explanations via `alertExplanationService`.
  *   6. Persists the resulting `YottalertAlert` rows.
- *   7. Updates the rule's last-seen cursors.
+ *   7. Updates the watch area's last-seen cursors.
  */
 
-import type { AlertRule, SyncRun, YottalertAlert } from '~/utils/yottalert/types';
+import type { SyncRun, WatchArea, YottalertAlert } from '~/utils/yottalert/types';
 import { changeDetectionService } from './changeDetectionService';
 import { alertExplanationService } from './alertExplanationService';
 import { alertScoringService } from './alertScoringService';
@@ -30,12 +30,12 @@ export interface RunOutcome {
     created: YottalertAlert[];
 }
 
-export async function runSyncForRule(rule: AlertRule): Promise<RunOutcome> {
+export async function runSyncForWatchArea(watchArea: WatchArea): Promise<RunOutcome> {
     const startedAt = new Date().toISOString();
     const syncRun: SyncRun = {
         id: randomId('sync'),
-        organizationId: rule.organizationId,
-        alertRuleId: rule.id,
+        organizationId: 'default-org',
+        watchAreaId: watchArea.id,
         status: 'running',
         startedAt,
         objectsChecked: 0,
@@ -44,9 +44,9 @@ export async function runSyncForRule(rule: AlertRule): Promise<RunOutcome> {
     };
 
     try {
-        const signal = await yottalertStore.getRuleFeedbackSignal(rule.id);
-        const suppression = await yottalertStore.getRuleSuppressionList(rule.id);
-        const candidates = await changeDetectionService.detectChanges(rule, suppression);
+        const signal = await yottalertStore.getWatchFeedbackSignal(watchArea.id);
+        const suppression = await yottalertStore.getWatchSuppressionList(watchArea.id);
+        const candidates = await changeDetectionService.detectChanges(watchArea, suppression);
         syncRun.objectsChecked = candidates.reduce(
             (acc, c) => acc + c.entities.length + c.events.length + c.relationships.length,
             0
@@ -54,14 +54,14 @@ export async function runSyncForRule(rule: AlertRule): Promise<RunOutcome> {
 
         const created: YottalertAlert[] = [];
         for (const candidate of candidates) {
-            if (candidate.confidence < rule.minimumConfidence) continue;
+            if (candidate.confidence < watchArea.minimumConfidence) continue;
 
-            const isNew = !rule.lastSeenEntityIds.some((id) =>
+            const isNew = !watchArea.lastSeenEntityIds.some((id) =>
                 candidate.elementalEntityIds.includes(id)
             );
 
             const baseScoring = alertScoringService.scoreCandidate({
-                rule,
+                watchArea,
                 candidate: { ...candidate, isNew },
                 suppression,
             });
@@ -70,7 +70,7 @@ export async function runSyncForRule(rule: AlertRule): Promise<RunOutcome> {
             const provenanceStatus = provenanceService.rollupProvenanceStatus(candidate.evidence);
 
             const explanation = alertExplanationService.composeExplanation({
-                rule,
+                watchArea,
                 severity: scoring.severity,
                 score: scoring.score,
                 confidence: candidate.confidence,
@@ -84,7 +84,7 @@ export async function runSyncForRule(rule: AlertRule): Promise<RunOutcome> {
 
             const alert: YottalertAlert = {
                 id: randomId('alert'),
-                alertRuleId: rule.id,
+                watchAreaId: watchArea.id,
                 title: explanation.title,
                 summary: explanation.summary,
                 whyItMatters: explanation.whyItMatters,
@@ -114,25 +114,25 @@ export async function runSyncForRule(rule: AlertRule): Promise<RunOutcome> {
             created.push(alert);
         }
 
-        const seenEntities = new Set(rule.lastSeenEntityIds);
-        const seenEvents = new Set(rule.lastSeenEventIds);
-        const seenRelationships = new Set(rule.lastSeenRelationshipIds);
+        const seenEntities = new Set(watchArea.lastSeenEntityIds);
+        const seenEvents = new Set(watchArea.lastSeenEventIds);
+        const seenRelationships = new Set(watchArea.lastSeenRelationshipIds);
         for (const c of created) {
             c.elementalEntityIds.forEach((id) => seenEntities.add(id));
             c.elementalEventIds.forEach((id) => seenEvents.add(id));
             c.elementalRelationshipIds.forEach((id) => seenRelationships.add(id));
         }
 
-        const updatedRule: AlertRule = {
-            ...rule,
+        const updatedWatchArea: WatchArea = {
+            ...watchArea,
             lastCheckedAt: new Date().toISOString(),
-            lastAlertedAt: created.length ? new Date().toISOString() : rule.lastAlertedAt,
+            lastAlertedAt: created.length ? new Date().toISOString() : watchArea.lastAlertedAt,
             lastSeenEntityIds: [...seenEntities].slice(-200),
             lastSeenEventIds: [...seenEvents].slice(-200),
             lastSeenRelationshipIds: [...seenRelationships].slice(-200),
             updatedAt: new Date().toISOString(),
         };
-        await yottalertStore.saveAlertRule(updatedRule);
+        await yottalertStore.saveWatchArea(updatedWatchArea);
 
         syncRun.status = 'completed';
         syncRun.completedAt = new Date().toISOString();
@@ -149,5 +149,5 @@ export async function runSyncForRule(rule: AlertRule): Promise<RunOutcome> {
     }
 }
 
-export const syncScheduler = { runSyncForRule };
+export const syncScheduler = { runSyncForWatchArea };
 export type SyncScheduler = typeof syncScheduler;

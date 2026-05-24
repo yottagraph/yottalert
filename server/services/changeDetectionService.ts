@@ -1,22 +1,23 @@
 /**
- * Change detection (PRD §5.6). For the MVP this is a deterministic
- * synthesizer that uses real Elemental data when reachable and falls
- * back to a small set of plausible, clearly-labeled demo candidates
- * when not.
- *
- * The output is always a list of *candidate* alerts (pre-scoring); the
- * scheduler scores + persists them downstream.
+ * Change detection for a single user watch area. Uses real Elemental article
+ * events when available and falls back to synthetic placeholders when not.
  */
 
+import { categoriesForInterests } from '~/utils/yottalert/interests';
+import {
+    canonicalTopicLabelsForCategories,
+    canonicalTopicLabelForCategory,
+} from '~/utils/yottalert/eventCategories';
 import type {
     AlertEntityRef,
     AlertEvidenceRef,
     AlertEventRef,
     AlertRelationshipRef,
-    AlertRule,
-    RuleSuppressionList,
+    WatchArea,
+    WatchSuppressionList,
 } from '~/utils/yottalert/types';
 import { elementalApiClient } from './elementalApiClient';
+import { elementalEventsClient } from './elementalEventsClient';
 
 export interface ChangeCandidate {
     title: string;
@@ -49,7 +50,7 @@ function nowMinusMinutes(min: number): string {
     return new Date(Date.now() - min * 60_000).toISOString();
 }
 
-async function gatherEntitiesForRule(rule: AlertRule): Promise<AlertEntityRef[]> {
+async function gatherEntitiesForArea(area: WatchArea): Promise<AlertEntityRef[]> {
     const out: AlertEntityRef[] = [];
     const seen = new Set<string>();
     const push = (neid: string | undefined, name: string | undefined) => {
@@ -60,42 +61,96 @@ async function gatherEntitiesForRule(rule: AlertRule): Promise<AlertEntityRef[]>
         out.push({ neid: neid || `local-${name}`, name });
     };
 
-    for (const ref of rule.structuredRule.entityRefs ?? []) {
-        push(ref.neid, ref.name);
+    if (area.geographyNeid || area.geographyLabel) {
+        push(area.geographyNeid, area.geographyLabel);
     }
 
-    if (rule.structuredRule.geography?.name && elementalApiClient.isConfigured()) {
-        const hits = await elementalApiClient.searchEntitiesByName(
-            rule.structuredRule.geography.name,
-            { maxResults: 5 }
-        );
+    if (area.geographyLabel && elementalApiClient.isConfigured()) {
+        const hits = await elementalApiClient.searchEntitiesByName(area.geographyLabel, {
+            maxResults: 5,
+        });
         for (const h of hits) push(h.neid, h.name);
     }
 
-    if (
-        rule.structuredRule.watchTargetValue &&
-        elementalApiClient.isConfigured() &&
-        out.length < 5
-    ) {
-        const hits = await elementalApiClient.searchEntitiesByName(
-            rule.structuredRule.watchTargetValue,
-            { maxResults: 5 - out.length }
-        );
+    if (area.geographyCode && elementalApiClient.isConfigured() && out.length < 5) {
+        const hits = await elementalApiClient.searchEntitiesByName(area.geographyCode, {
+            maxResults: 5 - out.length,
+        });
         for (const h of hits) push(h.neid, h.name);
     }
 
     return out;
 }
 
-function makeEvidence(
-    rule: AlertRule,
+function makeSyntheticEvents(area: WatchArea, entities: AlertEntityRef[]): AlertEventRef[] {
+    const categories = categoriesForInterests(area.interests);
+    const cat = categories[0] ?? 'local_news';
+    const canonical = canonicalTopicLabelForCategory(cat);
+    const labels = [
+        {
+            offset: 18,
+            title: `${canonical} reported${entities[0] ? ` near ${entities[0].name}` : ''}`,
+        },
+        {
+            offset: 96,
+            title: `Earlier ${canonical} flagged in watched ${area.geographyLabel}`,
+        },
+    ];
+    return labels.map((l, i) => ({
+        id: `${area.id}-evt-${i}`,
+        title: l.title,
+        type: canonical,
+        geography: area.geographyLabel,
+        occurredAt: nowMinusMinutes(l.offset),
+        confidence: 0.5,
+        source: 'synthetic',
+        status: 'historical',
+    }));
+}
+
+async function gatherEventsForArea(
+    area: WatchArea,
     entities: AlertEntityRef[],
     apiConfigured: boolean
+): Promise<AlertEventRef[]> {
+    if (!apiConfigured) return makeSyntheticEvents(area, entities);
+
+    const sinceMs = 30 * 24 * 60 * 60 * 1000;
+    const limit = 5;
+
+    try {
+        const categories = categoriesForInterests(area.interests);
+        const geoNeid = area.geographyNeid ?? entities[0]?.neid;
+        const rawEvents = await elementalEventsClient.fetchCategoryAnchoredEvents(
+            canonicalTopicLabelsForCategories(categories),
+            {
+                geoNeid,
+                sinceMs,
+                limit,
+            }
+        );
+
+        const realEvents = rawEvents.map((event) =>
+            elementalEventsClient.toAlertEventRef(event, area.geographyLabel)
+        );
+        if (realEvents.length) return realEvents;
+    } catch (error) {
+        console.warn('[changeDetectionService] gatherEventsForRule failed', error);
+    }
+
+    return makeSyntheticEvents(area, entities);
+}
+
+function makeEvidence(
+    area: WatchArea,
+    entities: AlertEntityRef[],
+    events: AlertEventRef[],
+    apiConfigured: boolean
 ): AlertEvidenceRef[] {
-    if (!apiConfigured) {
+    if (!apiConfigured || events.every((event) => event.source === 'synthetic')) {
         return [
             {
-                id: `${rule.id}-syn-1`,
+                id: `${area.id}-syn-1`,
                 evidenceType: 'synthetic',
                 displayText: `Synthetic preview — Elemental is not reachable, so this candidate is illustrative only.`,
                 sourceName: 'Yottalert local generator',
@@ -104,7 +159,7 @@ function makeEvidence(
         ];
     }
     const evidence: AlertEvidenceRef[] = entities.slice(0, 3).map((e, i) => ({
-        id: `${rule.id}-${e.neid}-${i}`,
+        id: `${area.id}-${e.neid}-${i}`,
         elementalObjectId: e.neid,
         elementalSourceId: undefined,
         evidenceType: 'elemental',
@@ -113,11 +168,27 @@ function makeEvidence(
         ingestedAt: nowIso(),
         confidence: 0.78,
     }));
-    if (rule.structuredRule.geography?.name) {
+
+    for (const [index, event] of events.slice(0, 3).entries()) {
         evidence.push({
-            id: `${rule.id}-geo`,
+            id: `${area.id}-event-${index}`,
+            elementalObjectId: event.id,
+            elementalSourceId: event.id,
             evidenceType: 'elemental',
-            displayText: `Geography match: ${rule.structuredRule.geography.name}.`,
+            displayText: event.title,
+            sourceName: event.publication?.name ?? 'Elemental article graph',
+            sourceUrl: event.url,
+            publishedAt: event.occurredAt,
+            ingestedAt: nowIso(),
+            confidence: event.confidence,
+        });
+    }
+
+    if (area.geographyLabel) {
+        evidence.push({
+            id: `${area.id}-geo`,
+            evidenceType: 'elemental',
+            displayText: `Geography match: ${area.geographyLabel}.`,
             sourceName: 'Elemental geography index',
             ingestedAt: nowIso(),
             confidence: 0.82,
@@ -126,89 +197,83 @@ function makeEvidence(
     return evidence;
 }
 
-function makeRelationships(rule: AlertRule, entities: AlertEntityRef[]): AlertRelationshipRef[] {
+function makeRelationships(area: WatchArea, entities: AlertEntityRef[]): AlertRelationshipRef[] {
     if (entities.length < 1) return [];
     const subjects = entities.slice(0, 2);
     return subjects.map((s, i) => ({
-        id: `${rule.id}-rel-${i}`,
+        id: `${area.id}-rel-${i}`,
         subject: s.name,
-        predicate: rule.structuredRule.relationshipTypes[0] ?? 'related_to',
-        object: rule.structuredRule.geography?.name ?? rule.structuredRule.watchTargetValue,
+        predicate: 'located_in',
+        object: area.geographyLabel,
         confidence: 0.74,
     }));
 }
 
-function makeEvents(rule: AlertRule, entities: AlertEntityRef[]): AlertEventRef[] {
-    const cat = rule.structuredRule.eventCategories[0] ?? 'local_news';
-    const labels = [
-        {
-            offset: 18,
-            title: `${humanize(cat)} reported${entities[0] ? ` near ${entities[0].name}` : ''}`,
-        },
-        {
-            offset: 96,
-            title: `Earlier ${humanize(cat)} flagged in watched ${rule.structuredRule.geography?.name ?? rule.structuredRule.watchTargetValue}`,
-        },
-    ];
-    return labels.map((l, i) => ({
-        id: `${rule.id}-evt-${i}`,
-        title: l.title,
-        type: cat,
-        geography: rule.structuredRule.geography?.name,
-        occurredAt: nowMinusMinutes(l.offset),
-        confidence: 0.72,
-    }));
-}
-
-function humanize(slug: string): string {
-    return slug.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
 export async function detectChanges(
-    rule: AlertRule,
-    suppression?: RuleSuppressionList | null
+    area: WatchArea,
+    suppression?: WatchSuppressionList | null
 ): Promise<ChangeCandidate[]> {
     const apiConfigured = elementalApiClient.isConfigured();
-    const entities = await gatherEntitiesForRule(rule);
-    const events = makeEvents(rule, entities);
-    const relationships = makeRelationships(rule, entities);
-    const evidence = makeEvidence(rule, entities, apiConfigured);
+    const entities = await gatherEntitiesForArea(area);
+    const events = await gatherEventsForArea(area, entities, apiConfigured);
+    const relationships = makeRelationships(area, entities);
+    const evidence = makeEvidence(area, entities, events, apiConfigured);
+    const recencyMinutes = Math.min(
+        ...events
+            .map((event) =>
+                event.occurredAt ? (Date.now() - Date.parse(event.occurredAt)) / 60_000 : 1440
+            )
+            .filter((value) => Number.isFinite(value))
+    );
+
+    const elementalEventIds = events
+        .filter((event) => event.source === 'elemental')
+        .map((event) => event.id);
 
     const candidates: ChangeCandidate[] = [
         {
-            title: events[0]?.title ?? `Change candidate for ${rule.name}`,
-            geographyLabel: rule.structuredRule.geography?.name,
+            title: events[0]?.title ?? `Change candidate for ${area.geographyLabel}`,
+            geographyLabel: area.geographyLabel,
             entities,
             events,
             relationships,
             evidence,
             confidence: apiConfigured ? 0.78 : 0.5,
-            recencyMinutes: 18,
+            recencyMinutes: Number.isFinite(recencyMinutes) ? recencyMinutes : 18,
             elementalEntityIds: entities.map((e) => e.neid),
-            elementalEventIds: events.map((e) => e.id),
+            elementalEventIds,
             elementalRelationshipIds: relationships.map((r) => r.id),
             elementalObjectIds: [
                 ...entities.map((e) => e.neid),
-                ...events.map((e) => e.id),
+                ...elementalEventIds,
                 ...relationships.map((r) => r.id),
             ],
         },
     ];
 
-    if (entities.length > 1) {
+    if (entities.length > 1 || events.length > 2) {
+        const secondaryEvents = events.slice(1, 3);
         candidates.push({
-            title: `Secondary change for ${rule.name}`,
-            geographyLabel: rule.structuredRule.geography?.name,
+            title: secondaryEvents[0]?.title ?? `Secondary change for ${area.geographyLabel}`,
+            geographyLabel: area.geographyLabel,
             entities: entities.slice(1, 3),
-            events: events.slice(1),
+            events: secondaryEvents,
             relationships: relationships.slice(0, 1),
-            evidence: evidence.slice(0, 2),
+            evidence: evidence.slice(0, 3),
             confidence: apiConfigured ? 0.66 : 0.45,
             recencyMinutes: 240,
             elementalEntityIds: entities.slice(1, 3).map((e) => e.neid),
-            elementalEventIds: events.slice(1).map((e) => e.id),
+            elementalEventIds: secondaryEvents
+                .filter((event) => event.source === 'elemental')
+                .map((event) => event.id),
             elementalRelationshipIds: relationships.slice(0, 1).map((r) => r.id),
-            elementalObjectIds: [],
+            elementalObjectIds: [
+                ...entities.slice(1, 3).map((e) => e.neid),
+                ...secondaryEvents
+                    .filter((event) => event.source === 'elemental')
+                    .map((event) => event.id),
+                ...relationships.slice(0, 1).map((r) => r.id),
+            ],
         });
     }
 

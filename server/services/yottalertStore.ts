@@ -1,5 +1,5 @@
 /**
- * KV-backed persistence for Yottalert state — alert rules, alerts,
+ * KV-backed persistence for Yottalert state — watch area, alerts,
  * sync runs, feedback (PRD §6).
  *
  * Two backends are supported, in order:
@@ -22,10 +22,10 @@ import { getRedis, isKVConfigured } from '../utils/redis';
 
 import type {
     AlertFeedback,
-    AlertRule,
-    RuleFeedbackSignal,
-    RuleSuppressionList,
     SyncRun,
+    WatchArea,
+    WatchFeedbackSignal,
+    WatchSuppressionList,
     YottalertAlert,
 } from '~/utils/yottalert/types';
 
@@ -154,17 +154,17 @@ export const yottalertStore = {
         return isKVConfigured() ? 'redis' : 'localfs';
     },
 
-    async saveAlertRule(rule: AlertRule): Promise<void> {
-        await setDoc('alert_rules', rule.id, rule);
+    async saveWatchArea(area: WatchArea): Promise<void> {
+        await setDoc('watch_areas', area.userId, area);
     },
-    async getAlertRule(id: string): Promise<AlertRule | null> {
-        return getDoc<AlertRule>('alert_rules', id);
+    async getWatchArea(userId: string): Promise<WatchArea | null> {
+        return getDoc<WatchArea>('watch_areas', userId);
     },
-    async deleteAlertRule(id: string): Promise<void> {
-        await deleteDoc('alert_rules', id);
+    async listWatchAreas(): Promise<WatchArea[]> {
+        return listDocs<WatchArea>('watch_areas');
     },
-    async listAlertRules(): Promise<AlertRule[]> {
-        return listDocs<AlertRule>('alert_rules');
+    async deleteWatchArea(userId: string): Promise<void> {
+        await deleteDoc('watch_areas', userId);
     },
 
     async saveAlert(alert: YottalertAlert): Promise<void> {
@@ -186,26 +186,26 @@ export const yottalertStore = {
     async listFeedback(alertId: string): Promise<AlertFeedback[]> {
         return listDocs<AlertFeedback>(`feedback:${alertId}`);
     },
-    async listFeedbackForRule(ruleId: string): Promise<AlertFeedback[]> {
+    async listFeedbackForWatchArea(watchAreaId: string): Promise<AlertFeedback[]> {
         const alerts = await listDocs<YottalertAlert>('alerts');
-        const alertIds = alerts.filter((a) => a.alertRuleId === ruleId).map((a) => a.id);
+        const alertIds = alerts.filter((a) => a.watchAreaId === watchAreaId).map((a) => a.id);
         if (!alertIds.length) return [];
         const batches = await Promise.all(
             alertIds.map((id) => listDocs<AlertFeedback>(`feedback:${id}`))
         );
         return batches.flat();
     },
-    async getRuleFeedbackSignal(ruleId: string): Promise<RuleFeedbackSignal | null> {
-        return getDoc<RuleFeedbackSignal>('rule_feedback_signals', ruleId);
+    async getWatchFeedbackSignal(watchAreaId: string): Promise<WatchFeedbackSignal | null> {
+        return getDoc<WatchFeedbackSignal>('watch_feedback_signals', watchAreaId);
     },
-    async saveRuleFeedbackSignal(signal: RuleFeedbackSignal): Promise<void> {
-        await setDoc('rule_feedback_signals', signal.ruleId, signal);
+    async saveWatchFeedbackSignal(signal: WatchFeedbackSignal): Promise<void> {
+        await setDoc('watch_feedback_signals', signal.watchAreaId, signal);
     },
-    async getRuleSuppressionList(ruleId: string): Promise<RuleSuppressionList | null> {
-        return getDoc<RuleSuppressionList>('rule_suppressions', ruleId);
+    async getWatchSuppressionList(watchAreaId: string): Promise<WatchSuppressionList | null> {
+        return getDoc<WatchSuppressionList>('watch_suppressions', watchAreaId);
     },
-    async saveRuleSuppressionList(list: RuleSuppressionList): Promise<void> {
-        await setDoc('rule_suppressions', list.ruleId, list);
+    async saveWatchSuppressionList(list: WatchSuppressionList): Promise<void> {
+        await setDoc('watch_suppressions', list.watchAreaId, list);
     },
 
     async saveSyncRun(run: SyncRun): Promise<void> {

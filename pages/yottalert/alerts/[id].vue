@@ -16,9 +16,9 @@
                     </div>
                     <h1 class="title">{{ alert.title }}</h1>
                     <div class="report-meta">
-                        Generated {{ relativeTime(alert.createdAt) }} · Rule
-                        <NuxtLink v-if="rule" :to="`/yottalert/alerts/new?ruleId=${rule.id}`"
-                            ><span class="mono">{{ rule.name }}</span></NuxtLink
+                        Generated {{ relativeTime(alert.createdAt) }} · Watching
+                        <NuxtLink v-if="watchArea" to="/yottalert/onboarding"
+                            ><span class="mono">{{ watchArea.geographyLabel }}</span></NuxtLink
                         >
                         <span v-else class="mono">unknown</span>
                     </div>
@@ -59,9 +59,6 @@
                 <section class="block">
                     <h2 class="section-title">Score breakdown</h2>
                     <AlertScoreBreakdown :breakdown="alert.scoreBreakdown" />
-                    <div v-if="feedbackAdjustmentLabel" class="feedback-adjustment">
-                        Feedback adjustment: {{ feedbackAdjustmentLabel }}
-                    </div>
                 </section>
 
                 <section class="block">
@@ -104,8 +101,9 @@
                                 <th>When</th>
                                 <th>Type</th>
                                 <th>Title</th>
-                                <th>Geography</th>
-                                <th>Confidence</th>
+                                <th>Publication</th>
+                                <th>Sentiment</th>
+                                <th>Details</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -121,9 +119,23 @@
                                     >
                                         {{ evt.title }}
                                     </NuxtLink>
+                                    <span v-if="evt.source === 'synthetic'" class="event-badge">
+                                        synthetic
+                                    </span>
                                 </td>
-                                <td>{{ evt.geography ?? '—' }}</td>
-                                <td class="mono">{{ Math.round(evt.confidence * 100) }}%</td>
+                                <td>{{ evt.publication?.name ?? '—' }}</td>
+                                <td class="mono">{{ eventSentimentLabel(evt) }}</td>
+                                <td>
+                                    <v-btn
+                                        size="x-small"
+                                        variant="outlined"
+                                        class="detail-btn"
+                                        :loading="loadingEventId === evt.id"
+                                        @click="openEvent(evt)"
+                                    >
+                                        Inspect
+                                    </v-btn>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -198,6 +210,7 @@
         </main>
 
         <EntityContextDrawer v-model="drawerOpen" :entity="drawerEntity" />
+        <EventContextDrawer v-model="eventDrawerOpen" :event="drawerEvent" />
     </YottalertShell>
 </template>
 
@@ -205,34 +218,37 @@
     import { computed, onMounted, ref } from 'vue';
     import { useRoute } from 'vue-router';
 
-    import { useRuleFeedback } from '~/composables/useRuleFeedback';
-    import type { AlertEntityRef, AlertRule, YottalertAlert } from '~/utils/yottalert/types';
+    import type {
+        AlertEntityRef,
+        AlertEventRef,
+        WatchArea,
+        YottalertAlert,
+    } from '~/utils/yottalert/types';
     import { relativeTime, severityTone } from '~/utils/yottalert/severity';
 
     definePageMeta({ layout: false });
 
     const route = useRoute();
     const alert = ref<YottalertAlert | null>(null);
-    const rule = ref<AlertRule | null>(null);
+    const watchArea = ref<WatchArea | null>(null);
     const loading = ref(true);
 
     const drawerOpen = ref(false);
     const drawerEntity = ref<AlertEntityRef | null>(null);
-    const { signal, load: loadSignal } = useRuleFeedback();
+    const eventDrawerOpen = ref(false);
+    const drawerEvent = ref<AlertEventRef | null>(null);
+    const loadingEventId = ref<string | null>(null);
 
     onMounted(load);
 
     async function load() {
         loading.value = true;
         try {
-            const res = await $fetch<{ alert: YottalertAlert; rule: AlertRule | null }>(
+            const res = await $fetch<{ alert: YottalertAlert; watchArea: WatchArea | null }>(
                 `/api/yottalert/alerts/${route.params.id}`
             );
             alert.value = res.alert;
-            rule.value = res.rule;
-            if (res.rule?.id) {
-                await loadSignal(res.rule.id);
-            }
+            watchArea.value = res.watchArea;
         } catch {
             alert.value = null;
         } finally {
@@ -243,23 +259,51 @@
     const severityLabel = computed(() =>
         alert.value ? severityTone(alert.value.severity).label.toUpperCase() : ''
     );
-    const feedbackAdjustmentLabel = computed(() => {
-        if (!alert.value || !Number.isFinite(alert.value.feedbackAdjustment)) return '';
-        const delta = alert.value.feedbackAdjustment as number;
-        const direction = delta > 0 ? '+' : '';
-        let reason = 'recent feedback on this rule';
-        if (signal.value) {
-            if (signal.value.noiseScore > signal.value.utilityScore)
-                reason = 'noise complaints on this rule';
-            if (signal.value.utilityScore > signal.value.noiseScore)
-                reason = 'useful/add-similar feedback';
-        }
-        return `${direction}${delta} points (${reason}).`;
-    });
 
     function openEntity(ent: AlertEntityRef) {
         drawerEntity.value = ent;
         drawerOpen.value = true;
+    }
+
+    function eventSentimentLabel(evt: AlertEventRef) {
+        if (typeof evt.sentiment !== 'number') return '—';
+        return `${evt.sentiment > 0 ? '+' : ''}${evt.sentiment.toFixed(2)}`;
+    }
+
+    function isSparseEvent(evt: AlertEventRef): boolean {
+        return (
+            !evt.publication && !evt.actors?.length && !evt.rawValues && evt.source !== 'synthetic'
+        );
+    }
+
+    async function openEvent(evt: AlertEventRef) {
+        if (!alert.value) return;
+
+        const events = alert.value.events;
+        const idx = events.findIndex((e) => e.id === evt.id);
+        if (idx < 0) return;
+
+        if (isSparseEvent(events[idx])) {
+            loadingEventId.value = evt.id;
+            try {
+                const res = await $fetch<{ event: AlertEventRef | null }>(
+                    `/api/yottalert/events/${encodeURIComponent(evt.id)}`
+                );
+                if (res.event) {
+                    events[idx] = {
+                        ...events[idx],
+                        ...res.event,
+                    };
+                }
+            } catch {
+                // Keep existing payload if detail fetch fails.
+            } finally {
+                loadingEventId.value = null;
+            }
+        }
+
+        drawerEvent.value = events[idx];
+        eventDrawerOpen.value = true;
     }
 </script>
 
@@ -444,10 +488,21 @@
         border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         color: rgba(255, 255, 255, 0.85);
     }
-    .feedback-adjustment {
-        margin-top: 10px;
-        font-size: 12px;
-        color: rgba(255, 255, 255, 0.65);
+    .event-badge {
+        margin-left: 8px;
+        display: inline-flex;
+        padding: 1px 6px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 176, 0, 0.5);
+        color: #ffcf6d;
+        font-size: 10px;
+        font-family: var(--font-mono);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+    .detail-btn {
+        text-transform: none;
+        letter-spacing: 0;
     }
     .rel-list {
         display: grid;

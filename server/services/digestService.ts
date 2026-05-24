@@ -32,7 +32,7 @@ export interface DigestPayload {
     generatedAt: string;
     windowStart: string;
     alertCount: number;
-    ruleCount: number;
+    watchAreaCount: number;
     severityCounts: Record<Severity, number>;
     citations: DigestCitation[];
     markdown: string;
@@ -161,7 +161,7 @@ export async function buildDailyDigest(options: {
     const alerts = (await yottalertStore.listAlerts()).filter(
         (a) => new Date(a.createdAt) >= start
     );
-    const rules = await yottalertStore.listAlertRules();
+    const watchAreas = await yottalertStore.listWatchAreas();
     const citations = buildCitations(alerts);
     const markdown = deterministicMarkdown(alerts, frequency, citations);
 
@@ -170,7 +170,7 @@ export async function buildDailyDigest(options: {
         generatedAt: new Date().toISOString(),
         windowStart: start.toISOString(),
         alertCount: alerts.length,
-        ruleCount: rules.length,
+        watchAreaCount: watchAreas.length,
         severityCounts: bySeverity(alerts),
         citations,
         markdown,

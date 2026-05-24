@@ -1,23 +1,25 @@
 import { computed, ref } from 'vue';
 
-import type { AlertRule, YottalertAlert } from '~/utils/yottalert/types';
+import type { WatchArea, YottalertAlert } from '~/utils/yottalert/types';
 
-const _rules = ref<AlertRule[]>([]);
+const _watchArea = ref<WatchArea | null>(null);
 const _alerts = ref<YottalertAlert[]>([]);
-const _rulesLoading = ref(false);
+const _watchAreaLoading = ref(false);
 const _alertsLoading = ref(false);
 const _backend = ref<string>('localfs');
 
-async function refreshRules(): Promise<void> {
-    _rulesLoading.value = true;
+async function refreshWatchArea(): Promise<void> {
+    _watchAreaLoading.value = true;
     try {
-        const res = await $fetch<{ rules: AlertRule[]; backend: string }>(
-            '/api/yottalert/alert-rules'
+        const res = await $fetch<{ watchArea: WatchArea; backend: string }>(
+            '/api/yottalert/watch-area'
         );
-        _rules.value = res.rules;
-        _backend.value = res.backend;
+        _watchArea.value = res.watchArea;
+        if (res.backend) _backend.value = res.backend;
+    } catch {
+        _watchArea.value = null;
     } finally {
-        _rulesLoading.value = false;
+        _watchAreaLoading.value = false;
     }
 }
 
@@ -32,7 +34,12 @@ async function refreshAlerts(): Promise<void> {
 }
 
 async function refreshAll(): Promise<void> {
-    await Promise.all([refreshRules(), refreshAlerts()]);
+    await Promise.all([refreshWatchArea(), refreshAlerts()]);
+}
+
+async function runCheckNow(): Promise<void> {
+    await $fetch('/api/yottalert/watch-area/check-now', { method: 'POST' });
+    await refreshAlerts();
 }
 
 export function useYottalert() {
@@ -41,22 +48,6 @@ export function useYottalert() {
     );
     const recent = computed(() => _alerts.value.slice(0, 20));
     const sortedByScore = computed(() => [..._alerts.value].sort((a, b) => b.score - a.score));
-
-    const watchedGeographies = computed(() => {
-        const counts = new Map<string, number>();
-        for (const r of _rules.value) {
-            const geo = r.structuredRule.geography?.name;
-            if (geo) counts.set(geo, (counts.get(geo) ?? 0) + 1);
-        }
-        for (const a of _alerts.value) {
-            if (a.geographyLabel) {
-                counts.set(a.geographyLabel, (counts.get(a.geographyLabel) ?? 0) + 1);
-            }
-        }
-        return [...counts.entries()]
-            .sort((a, b) => b[1] - a[1])
-            .map(([name, count]) => ({ name, count }));
-    });
 
     const watchedEntities = computed(() => {
         const counts = new Map<string, { count: number; neid?: string }>();
@@ -73,18 +64,18 @@ export function useYottalert() {
     });
 
     return {
-        rules: computed(() => _rules.value),
+        watchArea: computed(() => _watchArea.value),
         alerts: computed(() => _alerts.value),
-        rulesLoading: computed(() => _rulesLoading.value),
+        watchAreaLoading: computed(() => _watchAreaLoading.value),
         alertsLoading: computed(() => _alertsLoading.value),
         backend: computed(() => _backend.value),
         highSeverity,
         recent,
         sortedByScore,
-        watchedGeographies,
         watchedEntities,
-        refreshRules,
+        refreshWatchArea,
         refreshAlerts,
         refreshAll,
+        runCheckNow,
     };
 }

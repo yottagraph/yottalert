@@ -5,15 +5,15 @@
  */
 
 import type {
-    AlertRule,
     AlertEntityRef,
     AlertEventRef,
     AlertRelationshipRef,
     Severity,
+    WatchArea,
 } from '~/utils/yottalert/types';
 
 interface ExplainInputs {
-    rule: AlertRule;
+    watchArea: WatchArea;
     severity: Severity;
     score: number;
     confidence: number;
@@ -42,7 +42,7 @@ function joinNames(items: { name: string }[], max = 3): string {
 
 export function composeExplanation(inputs: ExplainInputs): Explanation {
     const {
-        rule,
+        watchArea,
         severity,
         confidence,
         geographyLabel,
@@ -52,7 +52,7 @@ export function composeExplanation(inputs: ExplainInputs): Explanation {
         sourceCount,
     } = inputs;
 
-    const focus = rule.structuredRule.watchTargetValue || rule.name;
+    const focus = watchArea.geographyLabel;
     const eventLabel = events.length === 1 ? '1 new event' : `${events.length} new events`;
     const entityLabel =
         entities.length === 1 ? '1 watched entity' : `${entities.length} watched entities`;
@@ -70,9 +70,9 @@ export function composeExplanation(inputs: ExplainInputs): Explanation {
     if (relLabel) summaryBits.push(relLabel);
     summaryBits.push(`${sourceCount || 0} source${sourceCount === 1 ? '' : 's'} attached`);
 
-    const summary = `Elemental detected ${summaryBits.join(' · ')}${where} matching watch rule "${rule.name}". Confidence ${Math.round(confidence * 100)}%.`;
+    const summary = `Elemental detected ${summaryBits.join(' · ')}${where} matching your active watch area. Confidence ${Math.round(confidence * 100)}%.`;
 
-    const why = describeWhy(rule, severity, geographyLabel, entities);
+    const why = describeWhy(watchArea, severity, geographyLabel, entities);
 
     const what = events.length
         ? `Newest event: ${events[0].title}${events[0].occurredAt ? ` (${events[0].occurredAt})` : ''}. ${entities.length ? `Linked to ${joinNames(entities)}.` : ''}`
@@ -80,7 +80,7 @@ export function composeExplanation(inputs: ExplainInputs): Explanation {
           ? `${joinNames(entities)} appeared in the watched ${geographyLabel ?? 'context'} since the last sync.`
           : `Relationship change detected in the watched ${geographyLabel ?? 'context'} since the last sync.`;
 
-    const next = suggestNext(rule, severity, entities);
+    const next = suggestNext(watchArea, severity, entities);
 
     return {
         title,
@@ -92,13 +92,13 @@ export function composeExplanation(inputs: ExplainInputs): Explanation {
 }
 
 function describeWhy(
-    rule: AlertRule,
+    watchArea: WatchArea,
     severity: Severity,
     geo: string | undefined,
     entities: AlertEntityRef[]
 ): string {
     if (severity === 'high') {
-        return `Above the rule's sensitivity threshold (${rule.sensitivity}). ${
+        return `Above your watch area's confidence threshold (${watchArea.minimumConfidence.toFixed(2)}). ${
             geo ? `Direct exposure to ${geo}.` : 'Entity exposure detected.'
         } Confirm before next briefing.`;
     }
@@ -106,12 +106,12 @@ function describeWhy(
         return `Moderate match on ${geo ? `${geo}` : 'watched entities'}${entities.length ? ` (incl. ${entities[0].name})` : ''}. Review when convenient.`;
     }
     if (severity === 'low') {
-        return `Weak signal — flagged because the rule is set to ${rule.sensitivity} sensitivity. Suppress similar items if noisy.`;
+        return `Weak signal — it still passed your watch threshold (${watchArea.minimumConfidence.toFixed(2)}). Suppress similar items if noisy.`;
     }
     return 'Below the suppression threshold; recorded for audit only.';
 }
 
-function suggestNext(rule: AlertRule, severity: Severity, entities: AlertEntityRef[]): string {
+function suggestNext(watchArea: WatchArea, severity: Severity, entities: AlertEntityRef[]): string {
     if (severity === 'high') {
         return entities.length
             ? `Open the Entity Context Drawer for ${entities[0].name} and confirm provenance before escalating.`
@@ -121,7 +121,7 @@ function suggestNext(rule: AlertRule, severity: Severity, entities: AlertEntityR
         return 'Inspect the linked evidence and confirm whether this needs a follow-up.';
     }
     if (severity === 'low') {
-        return `If this is noisy, tighten the minimum confidence (${rule.minimumConfidence.toFixed(2)}) or add an exclusion.`;
+        return `If this is noisy, tighten the minimum confidence (${watchArea.minimumConfidence.toFixed(2)}).`;
     }
     return 'No action required — alert is suppressed.';
 }

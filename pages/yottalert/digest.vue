@@ -20,7 +20,7 @@
             <template v-else-if="digest">
                 <div class="meta-strip">
                     <span class="chip">{{ digest.alertCount }} alerts</span>
-                    <span class="chip">{{ digest.ruleCount }} rules</span>
+                    <span class="chip">{{ digest.watchAreaCount }} watch area</span>
                     <span class="chip"
                         >{{ digest.severityCounts.high }} high ·
                         {{ digest.severityCounts.medium }} medium</span
