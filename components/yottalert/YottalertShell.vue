@@ -19,9 +19,9 @@
                 <div class="sidebar-footer">
                     <div class="footer-line">{{ alertCount }} alerts</div>
                     <div class="footer-line">
-                        Current watch:
+                        Watch areas:
                         <span class="watch-name">
-                            {{ watchArea?.geographyLabel ?? 'not set' }}
+                            {{ watchAreas.length || 'not set' }}
                         </span>
                     </div>
                     <div class="footer-line">
@@ -52,7 +52,7 @@
     import { useYottalert } from '~/composables/useYottalert';
 
     const route = useRoute();
-    const { watchArea, alerts, backend, refreshAll } = useYottalert();
+    const { watchAreas, alerts, backend, refreshAll } = useYottalert();
 
     onMounted(() => {
         refreshAll();

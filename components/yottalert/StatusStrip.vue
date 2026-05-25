@@ -18,8 +18,8 @@
             <span class="value">{{ lastSync }}</span>
         </div>
         <div class="chip">
-            <span class="kicker">WATCH AREA</span>
-            <span class="value">{{ watchArea ? watchArea.geographyType : 'none' }}</span>
+            <span class="kicker">WATCH AREAS</span>
+            <span class="value">{{ watchAreas.length || 'none' }}</span>
         </div>
         <div class="chip">
             <span class="kicker">ALERTS · 24H</span>
@@ -43,7 +43,7 @@
     import { relativeTime } from '~/utils/yottalert/severity';
 
     const elemental = useElementalStatus();
-    const { watchArea, alerts } = useYottalert();
+    const { watchAreas, alerts } = useYottalert();
 
     const alerts24h = computed(() => {
         const cutoff = Date.now() - 24 * 3600 * 1000;
@@ -51,7 +51,11 @@
     });
     const highCount = computed(() => alerts.value.filter((a) => a.severity === 'high').length);
     const lastSync = computed(() => {
-        const lastChecked = watchArea.value?.lastCheckedAt;
+        const lastChecked = watchAreas.value
+            .map((area) => area.lastCheckedAt)
+            .filter((value): value is string => Boolean(value))
+            .sort()
+            .at(-1);
         if (lastChecked) return relativeTime(lastChecked);
         return elemental.status.value
             ? relativeTime(elemental.status.value.lastCheckedAt)

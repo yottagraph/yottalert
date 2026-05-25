@@ -7,6 +7,7 @@ export const INTEREST_LABELS: Record<InterestKey, string> = {
     government: 'Government',
     jobs: 'Jobs',
     civic: 'Civic news',
+    culture: 'Culture & events',
 };
 
 export const INTEREST_TO_EVENT_CATEGORIES: Record<InterestKey, string[]> = {
@@ -27,6 +28,7 @@ export const INTEREST_TO_EVENT_CATEGORIES: Record<InterestKey, string[]> = {
     ],
     jobs: ['hiring', 'layoffs', 'personnel_changes'],
     civic: ['local_news', 'political_commentary', 'lawsuit'],
+    culture: ['entertainment', 'sports', 'industry_award', 'conference', 'festival', 'concert'],
 };
 
 export function categoriesForInterests(interests: InterestKey[]): string[] {

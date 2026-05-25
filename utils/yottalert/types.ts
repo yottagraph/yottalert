@@ -10,7 +10,8 @@ export type InterestKey =
     | 'business'
     | 'government'
     | 'jobs'
-    | 'civic';
+    | 'civic'
+    | 'culture';
 
 export type GeographyType = 'zip' | 'county';
 

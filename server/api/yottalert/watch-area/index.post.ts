@@ -1,5 +1,6 @@
 import type { InterestKey, WatchArea } from '~/utils/yottalert/types';
 import { yottalertStore } from '~/server/services/yottalertStore';
+import { getYottalertUserId } from '~/server/utils/yottalertUser';
 
 interface CreateWatchAreaBody {
     userId?: string;
@@ -13,7 +14,7 @@ interface CreateWatchAreaBody {
 
 export default defineEventHandler(async (event) => {
     const body = await readBody<CreateWatchAreaBody>(event);
-    const userId = body.userId || 'dev-user';
+    const userId = await getYottalertUserId(event, body.userId);
     const geographyType = body.geographyType;
     const geographyCode = body.geographyCode?.trim();
     const geographyLabel = body.geographyLabel?.trim();
@@ -36,8 +37,9 @@ export default defineEventHandler(async (event) => {
     }
 
     const now = new Date().toISOString();
+    const areaId = `wa-${userId}-${Date.now().toString(36)}`;
     const watchArea: WatchArea = {
-        id: `wa-${userId}`,
+        id: areaId,
         userId,
         geographyType,
         geographyCode,

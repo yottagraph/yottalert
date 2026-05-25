@@ -4,15 +4,43 @@
             <header class="page-head">
                 <span class="kicker">YOTTALERT</span>
                 <h1 class="page-title">
-                    {{ watchArea ? `Watching ${watchArea.geographyLabel}` : 'Watch overview' }}
+                    {{
+                        watchAreas.length
+                            ? `Watching ${watchAreas.length} area${watchAreas.length === 1 ? '' : 's'}`
+                            : 'Watch overview'
+                    }}
                 </h1>
                 <p class="page-subtitle">
                     Live Elemental context · {{ alertSummary }}
-                    <NuxtLink to="/yottalert/onboarding" class="change-link">Change area</NuxtLink>
+                    <NuxtLink to="/yottalert/onboarding?mode=add" class="change-link">
+                        Add area
+                    </NuxtLink>
                 </p>
             </header>
 
             <StatusStrip />
+
+            <section v-if="watchAreas.length" class="section">
+                <div class="section-head">
+                    <h2 class="section-title">Watch areas</h2>
+                    <NuxtLink to="/yottalert/onboarding?mode=add" class="change-link">
+                        Add another
+                    </NuxtLink>
+                </div>
+                <div class="watch-area-grid">
+                    <NuxtLink
+                        v-for="area in watchAreas"
+                        :key="area.id"
+                        class="watch-area-card"
+                        :to="`/yottalert/onboarding?id=${encodeURIComponent(area.id)}`"
+                    >
+                        <div class="watch-area-name">{{ area.geographyLabel }}</div>
+                        <div class="watch-area-meta">
+                            {{ area.geographyType }} · {{ area.interests.length }} interests
+                        </div>
+                    </NuxtLink>
+                </div>
+            </section>
 
             <section class="section">
                 <div class="section-head">
@@ -36,16 +64,16 @@
                 <div v-else class="empty-card">
                     <div class="kicker">NO HIGH-SEVERITY ALERTS YET</div>
                     <div class="empty-text">
-                        Create an alert rule and run "Check now" to surface candidate alerts
-                        directly from Elemental.
+                        Add a watch area and run "Check now" to surface candidate alerts directly
+                        from Elemental.
                     </div>
                     <v-btn
                         color="primary"
-                        to="/yottalert/onboarding"
+                        to="/yottalert/onboarding?mode=add"
                         class="mt-3"
                         prepend-icon="mdi-map-marker-radius-outline"
                     >
-                        {{ watchArea ? 'Change your watch area' : 'Set your watch area' }}
+                        Add watch area
                     </v-btn>
                 </div>
             </section>
@@ -77,8 +105,16 @@
 
     definePageMeta({ layout: false });
 
-    const { watchArea, alerts, highSeverity, recent, alertsLoading, refreshAll, runCheckNow } =
-        useYottalert();
+    const {
+        watchArea,
+        watchAreas,
+        alerts,
+        highSeverity,
+        recent,
+        alertsLoading,
+        refreshAll,
+        runCheckNow,
+    } = useYottalert();
     const { refresh: refreshStatus } = useElementalStatus();
     const runningCheckNow = ref(false);
 
@@ -159,6 +195,32 @@
     .recent-list {
         display: grid;
         gap: 10px;
+    }
+    .watch-area-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 10px;
+    }
+    .watch-area-card {
+        display: block;
+        padding: 14px 16px;
+        background: var(--lv-surface);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        text-decoration: none;
+        color: inherit;
+    }
+    .watch-area-name {
+        font-weight: 600;
+        font-size: 14px;
+    }
+    .watch-area-meta {
+        margin-top: 6px;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.55);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
     }
     .empty-card {
         background: var(--lv-surface);

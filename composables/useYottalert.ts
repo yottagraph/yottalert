@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import type { WatchArea, YottalertAlert } from '~/utils/yottalert/types';
 
 const _watchArea = ref<WatchArea | null>(null);
+const _watchAreas = ref<WatchArea[]>([]);
 const _alerts = ref<YottalertAlert[]>([]);
 const _watchAreaLoading = ref(false);
 const _alertsLoading = ref(false);
@@ -11,13 +12,17 @@ const _backend = ref<string>('localfs');
 async function refreshWatchArea(): Promise<void> {
     _watchAreaLoading.value = true;
     try {
-        const res = await $fetch<{ watchArea: WatchArea; backend: string }>(
-            '/api/yottalert/watch-area'
-        );
+        const res = await $fetch<{
+            watchArea: WatchArea;
+            watchAreas?: WatchArea[];
+            backend: string;
+        }>('/api/yottalert/watch-area');
         _watchArea.value = res.watchArea;
+        _watchAreas.value = res.watchAreas ?? [res.watchArea];
         if (res.backend) _backend.value = res.backend;
     } catch {
         _watchArea.value = null;
+        _watchAreas.value = [];
     } finally {
         _watchAreaLoading.value = false;
     }
@@ -65,6 +70,7 @@ export function useYottalert() {
 
     return {
         watchArea: computed(() => _watchArea.value),
+        watchAreas: computed(() => _watchAreas.value),
         alerts: computed(() => _alerts.value),
         watchAreaLoading: computed(() => _watchAreaLoading.value),
         alertsLoading: computed(() => _alertsLoading.value),

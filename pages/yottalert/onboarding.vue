@@ -3,7 +3,7 @@
         <section class="card">
             <span class="kicker">YOTTALERT</span>
             <h1 class="title">
-                {{ existingWatchArea ? 'Change your watch area' : 'Start with one place' }}
+                {{ existingWatchArea ? 'Change your watch area' : 'Add a watch area' }}
             </h1>
             <p class="subtitle">
                 Pick a ZIP code or county, then choose a few things you care about.
@@ -58,13 +58,14 @@
 
 <script setup lang="ts">
     import { computed, onMounted, ref } from 'vue';
-    import { useRouter } from 'vue-router';
+    import { useRoute, useRouter } from 'vue-router';
 
     import { INTEREST_LABELS } from '~/utils/yottalert/interests';
     import type { GeographySearchResult, InterestKey, WatchArea } from '~/utils/yottalert/types';
 
     definePageMeta({ layout: false });
 
+    const route = useRoute();
     const router = useRouter();
     const selectedGeography = ref<GeographySearchResult | null>(null);
     const geographySuggestions = ref<GeographySearchResult[]>([]);
@@ -90,16 +91,23 @@
 
     onMounted(async () => {
         try {
-            const res = await $fetch<{ watchArea: WatchArea }>('/api/yottalert/watch-area');
-            existingWatchArea.value = res.watchArea;
+            if (route.query.mode === 'add') return;
+            const res = await $fetch<{ watchArea: WatchArea; watchAreas?: WatchArea[] }>(
+                '/api/yottalert/watch-area'
+            );
+            const routeId = typeof route.query.id === 'string' ? route.query.id : '';
+            const area =
+                (routeId && res.watchAreas?.find((candidate) => candidate.id === routeId)) ||
+                res.watchArea;
+            existingWatchArea.value = area;
             selectedGeography.value = {
-                neid: res.watchArea.geographyNeid,
-                name: res.watchArea.geographyLabel,
-                geographyType: res.watchArea.geographyType,
-                code: res.watchArea.geographyCode,
+                neid: area.geographyNeid,
+                name: area.geographyLabel,
+                geographyType: area.geographyType,
+                code: area.geographyCode,
             };
             geographySuggestions.value = [selectedGeography.value];
-            selectedInterests.value = [...res.watchArea.interests];
+            selectedInterests.value = [...area.interests];
         } catch {
             // Stay on onboarding if no watch area exists yet.
         }
@@ -140,9 +148,11 @@
         saving.value = true;
         errorMessage.value = '';
         try {
+            const method = existingWatchArea.value ? 'PATCH' : 'POST';
             await $fetch('/api/yottalert/watch-area', {
-                method: 'POST',
+                method,
                 body: {
+                    id: existingWatchArea.value?.id,
                     geographyType: selectedGeography.value.geographyType,
                     geographyCode: selectedGeography.value.code,
                     geographyLabel: selectedGeography.value.name,

@@ -17,10 +17,17 @@
                 </div>
             </div>
 
+            <v-alert v-else-if="errorMessage" type="error" variant="tonal" class="mb-4">
+                {{ errorMessage }}
+            </v-alert>
+
             <template v-else-if="digest">
                 <div class="meta-strip">
                     <span class="chip">{{ digest.alertCount }} alerts</span>
-                    <span class="chip">{{ digest.watchAreaCount }} watch area</span>
+                    <span class="chip"
+                        >{{ digest.watchAreaCount }} watch
+                        {{ digest.watchAreaCount === 1 ? 'area' : 'areas' }}</span
+                    >
                     <span class="chip"
                         >{{ digest.severityCounts.high }} high ·
                         {{ digest.severityCounts.medium }} medium</span
@@ -88,15 +95,20 @@
     const frequency = ref<'daily' | 'weekly'>('daily');
     const digest = ref<DigestPayload | null>(null);
     const loading = ref(false);
+    const errorMessage = ref('');
 
     async function load(force = false) {
         loading.value = true;
+        errorMessage.value = '';
         try {
             const params = new URLSearchParams({ frequency: frequency.value });
             if (force) params.set('force', 'true');
             digest.value = await $fetch<DigestPayload>(
                 `/api/yottalert/digest/daily?${params.toString()}`
             );
+        } catch (error) {
+            digest.value = null;
+            errorMessage.value = error instanceof Error ? error.message : 'Could not load digest.';
         } finally {
             loading.value = false;
         }

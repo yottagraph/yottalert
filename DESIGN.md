@@ -684,15 +684,15 @@ Digest contains no number absent from the deterministic data context and no [N] 
 
 ## Status
 
-The product now uses a ZIP/county-first watch area model. Users configure a single area and interest chips, then receive ranked alerts for that area. The prior free-form Alert Builder and `alert-rules` API surface have been removed from the running implementation.
+The product now uses a ZIP/county-first watch area model. Users can configure multiple areas and interest chips, including culture/events, then receive ranked alerts across those areas. The prior free-form Alert Builder and `alert-rules` API surface have been removed from the running implementation.
 
 ## Modules
 
-- **Three-pane shell** — `components/AppHeader.vue` + `components/yottalert/YottalertShell.vue` + `YottalertProvenanceFooter`, with a slim nav (`Dashboard`, `Digest`, `Settings`) and current-watch footer.
-- **Watch Area Onboarding** — `pages/yottalert/onboarding.vue`, backed by `/api/yottalert/geographies/search` and `/api/yottalert/watch-area`, then immediate `/api/yottalert/watch-area/check-now`.
-- **Dashboard** — `pages/yottalert/index.vue` shows the active watch area, status strip, high-priority cards, and recent alerts.
+- **Three-pane shell** — `components/AppHeader.vue` + `components/yottalert/YottalertShell.vue` + `YottalertProvenanceFooter`, with a slim nav (`Dashboard`, `Digest`, `Settings`) and watch-area count footer.
+- **Watch Area Onboarding** — `pages/yottalert/onboarding.vue`, backed by `/api/yottalert/geographies/search` and `/api/yottalert/watch-area`, supports adding or editing areas, then immediate `/api/yottalert/watch-area/check-now`.
+- **Dashboard** — `pages/yottalert/index.vue` shows all watch areas, status strip, high-priority cards, and recent alerts.
 - **Alert Detail** — `pages/yottalert/alerts/[id].vue` keeps score breakdown, evidence/provenance, and feedback.
-- **Server services** — `changeDetectionService.ts` now consumes `WatchArea` + interest chips; `syncScheduler.ts` runs `runSyncForWatchArea()`; `yottalertStore.ts` persists one watch area per user plus alerts/feedback/sync runs.
+- **Server services** — `changeDetectionService.ts` now consumes `WatchArea` + interest chips; `syncScheduler.ts` runs `runSyncForWatchArea()`; `yottalertStore.ts` persists multiple watch areas per user plus alerts/feedback/sync runs.
 - **API routes** — `watch-area` (get/post/patch/check-now), `geographies/search`, `alerts`, `digest/daily`, and Elemental status/connection routes.
 - **Composables** — `useElementalStatus`, `useYottalert`.
 

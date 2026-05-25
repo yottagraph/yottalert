@@ -303,7 +303,7 @@
     color: var(--yottalert-text) !important;
 }
 
-.theme-brand .yottalert-shell :where(.alert-card, .empty-card, .status-strip .chip),
+.theme-brand .yottalert-shell :where(.alert-card, .empty-card, .watch-area-card, .status-strip .chip),
 .theme-brand .onboarding .card {
     background: var(--yottalert-surface) !important;
     border-color: var(--yottalert-border) !important;
@@ -339,6 +339,7 @@
         .chip,
         .footer-text,
         .footer-line,
+        .watch-area-meta,
         .muted
     ) {
     color: var(--yottalert-text-secondary) !important;

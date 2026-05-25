@@ -155,16 +155,26 @@ export const yottalertStore = {
     },
 
     async saveWatchArea(area: WatchArea): Promise<void> {
-        await setDoc('watch_areas', area.userId, area);
+        await setDoc('watch_areas', area.id, area);
     },
     async getWatchArea(userId: string): Promise<WatchArea | null> {
+        const areas = await this.listWatchAreas(userId);
+        if (areas.length) return areas[0];
+
+        // Backward compatibility for older local/Redis data keyed by user id.
         return getDoc<WatchArea>('watch_areas', userId);
     },
-    async listWatchAreas(): Promise<WatchArea[]> {
-        return listDocs<WatchArea>('watch_areas');
+    async listWatchAreas(userId?: string): Promise<WatchArea[]> {
+        const areas = await listDocs<WatchArea>('watch_areas');
+        return areas
+            .filter((area) => (userId ? area.userId === userId : true))
+            .sort((a, b) => (b.updatedAt > a.updatedAt ? 1 : -1));
     },
-    async deleteWatchArea(userId: string): Promise<void> {
-        await deleteDoc('watch_areas', userId);
+    async getWatchAreaById(id: string): Promise<WatchArea | null> {
+        return getDoc<WatchArea>('watch_areas', id);
+    },
+    async deleteWatchArea(id: string): Promise<void> {
+        await deleteDoc('watch_areas', id);
     },
 
     async saveAlert(alert: YottalertAlert): Promise<void> {

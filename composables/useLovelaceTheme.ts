@@ -1,4 +1,4 @@
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, shallowRef, watch } from 'vue';
 import { useTheme } from 'vuetify';
 import { Pref } from '~/composables/usePrefsStore';
 import { useUserState } from '~/composables/useUserState';
@@ -11,7 +11,7 @@ import {
 
 const themeId = ref<ThemePresetId>(DEFAULT_THEME_ID);
 const initialized = ref(false);
-const themePref = ref<Pref<string> | null>(null);
+const themePref = shallowRef<Pref<string> | null>(null);
 const prefReady = ref(false);
 
 export const useLovelaceTheme = () => {

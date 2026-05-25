@@ -158,10 +158,11 @@ export async function buildDailyDigest(options: {
 
     const t0 = Date.now();
     const start = windowStart(frequency);
+    const watchAreas = await yottalertStore.listWatchAreas(options.userId);
+    const watchAreaIds = new Set(watchAreas.map((area) => area.id));
     const alerts = (await yottalertStore.listAlerts()).filter(
-        (a) => new Date(a.createdAt) >= start
+        (a) => watchAreaIds.has(a.watchAreaId) && new Date(a.createdAt) >= start
     );
-    const watchAreas = await yottalertStore.listWatchAreas();
     const citations = buildCitations(alerts);
     const markdown = deterministicMarkdown(alerts, frequency, citations);
 

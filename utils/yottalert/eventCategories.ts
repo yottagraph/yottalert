@@ -64,6 +64,9 @@ const CATEGORY_TO_TOPIC_LABEL: Record<string, string> = {
     personnel_changes: 'Personnel changes',
     sports: 'Sports',
     entertainment: 'Entertainment',
+    conference: 'Entertainment',
+    festival: 'Entertainment',
+    concert: 'Entertainment',
 };
 
 function humanize(slug: string): string {
