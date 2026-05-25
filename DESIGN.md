@@ -8,7 +8,7 @@ Implement the three-pane shell (app.vue + AppHeader.vue + YottalertShell.vue) fo
 
 Create services: elementalMcpClient.ts, elementalApiClient.ts, changeDetectionService.ts, alertScoringService.ts, alertExplanationService.ts, provenanceService.ts, syncScheduler.ts, digestService.ts. The MCP client must expose stable Yottalert function names even if Elemental tool names change. Never invoke MCP from the browser.
 
-Build screens: Dashboard, Watch Area Onboarding, Alert Detail, Entity Context Drawer, Geography Context Page, Provenance View, Elemental Connection Settings. Onboarding is now ZIP/county first: set one watch area, pick 2-5 interests, then monitor important alerts for that area. The Alert Detail page answers what happened / why it matters / what changed / who-where / evidence / confidence / next step, with a 6-component score breakdown and a feedback bar (Useful · Not relevant · Duplicate · Wrong location · Wrong entity · Too noisy · Too late · Increase sensitivity · Decrease sensitivity · Add similar · Suppress similar).
+Build screens: Dashboard, Watch Area Onboarding, Alert Detail, Entity Context Drawer, Geography Context Page, Provenance View, Elemental Connection Settings. Onboarding is now ZIP/county first: set one or more watch areas, pick one or more interests, then monitor important alerts for those areas. The Alert Detail page answers what happened / why it matters / what changed / who-where / evidence / confidence / next step, with a 6-component score breakdown and a feedback bar (Useful · Not relevant · Duplicate · Wrong location · Wrong entity · Too noisy · Too late · Increase sensitivity · Decrease sensitivity · Add similar · Suppress similar).
 
 Use the Wealth Atlas agent UX for live workflow surfaces: SSE through /api/agent/[engineId]/stream, live step card under the in-flight bubble with AgentSteps (6-step Yottalert taxonomy: Dialogue → Watch Resolution → Graph Retrieval → Change Detection → Scoring → Composition), requestAnimationFrame typewriter at ~840 chars/sec, post-completion AgentMetaBar with model, tokens, cost, and feedback. Fall back to a deterministic Nitro endpoint when the ADK agent is unavailable.
 
@@ -460,7 +460,7 @@ User picks one geography result that resolves to `{ geographyType, geographyCode
 
 Step 2 — interest chips:
 
-User selects 2-5 chips from: Real estate, Public safety, Business, Government, Jobs, Civic news.
+User selects one or more chips from: Real estate, Public safety, Business, Government, Jobs, Civic news, Culture & events.
 Submit stores the watch area via `POST /api/yottalert/watch-area`, then triggers `POST /api/yottalert/watch-area/check-now`.
 
 The dashboard and sidebar always reflect this single active watch area.

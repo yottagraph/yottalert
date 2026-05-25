@@ -1,6 +1,15 @@
 import type { GeographySearchResult } from '~/utils/yottalert/types';
 import { elementalApiClient } from '~/server/services/elementalApiClient';
 
+const ZIP_FALLBACKS: Record<string, GeographySearchResult> = {
+    '15222': {
+        neid: '08756969412017621503',
+        name: 'Pittsburgh, PA 15222 (Allegheny County)',
+        geographyType: 'zip',
+        code: '15222',
+    },
+};
+
 function slugify(value: string): string {
     return value
         .toLowerCase()
@@ -34,6 +43,18 @@ function toResult(name: string, neid?: string): GeographySearchResult | null {
     return null;
 }
 
+function fallbackZipResult(q: string): GeographySearchResult | null {
+    const zipMatch = q.match(/^\d{5}$/);
+    if (!zipMatch) return null;
+    return (
+        ZIP_FALLBACKS[q] ?? {
+            name: `ZIP ${q}`,
+            geographyType: 'zip',
+            code: q,
+        }
+    );
+}
+
 export default defineEventHandler(async (event) => {
     const query = getQuery(event);
     const q = String(query.q || '').trim();
@@ -48,6 +69,13 @@ export default defineEventHandler(async (event) => {
         .map((hit) => toResult(hit.name, hit.neid))
         .filter((result): result is GeographySearchResult => Boolean(result))
         .filter((result) => (requestedType ? result.geographyType === requestedType : true));
+    const fallback = fallbackZipResult(q);
+    if (fallback && (!requestedType || requestedType === 'zip')) {
+        const alreadyPresent = results.some(
+            (result) => result.geographyType === 'zip' && result.code === fallback.code
+        );
+        if (!alreadyPresent) results.unshift(fallback);
+    }
 
     return { results };
 });

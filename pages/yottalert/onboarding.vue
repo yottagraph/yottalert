@@ -24,7 +24,7 @@
             />
 
             <div class="interest-section">
-                <div class="interest-title">Interests (pick 2-5)</div>
+                <div class="interest-title">Interests (pick one or more)</div>
                 <div class="interest-grid">
                     <button
                         v-for="option in interestOptions"
@@ -83,10 +83,7 @@
     }));
 
     const canSubmit = computed(
-        () =>
-            Boolean(selectedGeography.value) &&
-            selectedInterests.value.length >= 2 &&
-            selectedInterests.value.length <= 5
+        () => Boolean(selectedGeography.value) && selectedInterests.value.length >= 1
     );
 
     onMounted(async () => {
@@ -118,7 +115,6 @@
             selectedInterests.value = selectedInterests.value.filter((item) => item !== key);
             return;
         }
-        if (selectedInterests.value.length >= 5) return;
         selectedInterests.value = [...selectedInterests.value, key];
     }
 

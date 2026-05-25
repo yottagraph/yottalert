@@ -24,8 +24,8 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 403, statusMessage: 'Forbidden' });
 
     const nextInterests = body.interests ?? existing.interests;
-    if (nextInterests.length < 2 || nextInterests.length > 5) {
-        throw createError({ statusCode: 400, statusMessage: 'Select 2-5 interests' });
+    if (nextInterests.length < 1) {
+        throw createError({ statusCode: 400, statusMessage: 'Select at least one interest' });
     }
 
     const watchArea: WatchArea = {

@@ -32,8 +32,8 @@ export default defineEventHandler(async (event) => {
             statusMessage: 'geographyCode and geographyLabel are required',
         });
     }
-    if (interests.length < 2 || interests.length > 5) {
-        throw createError({ statusCode: 400, statusMessage: 'Select 2-5 interests' });
+    if (interests.length < 1) {
+        throw createError({ statusCode: 400, statusMessage: 'Select at least one interest' });
     }
 
     const now = new Date().toISOString();
