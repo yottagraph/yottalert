@@ -108,6 +108,7 @@ export interface YottalertAlert {
     confidence: number;
     createdAt: string;
     sourceCount: number;
+    retrievalSource?: 'galaxy' | 'find';
     provenanceStatus: ProvenanceStatus;
     feedbackAdjustment?: number;
     status: AlertStatus;
@@ -197,8 +198,11 @@ export interface SyncRun {
 export interface ElementalConnectionStatus {
     apiReachable: boolean;
     mcpReachable: boolean;
+    galaxyReachable?: boolean;
     lastCheckedAt: string;
     latencyMs?: number;
+    galaxyLatencyMs?: number;
+    galaxyEntityCount?: number;
     mcpToolCount?: number;
     apiVersion?: string;
     lastError?: string;

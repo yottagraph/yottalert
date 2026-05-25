@@ -98,6 +98,7 @@ export async function runSyncForWatchArea(watchArea: WatchArea): Promise<RunOutc
                 confidence: provenanceService.rollupConfidence(candidate.evidence),
                 createdAt: new Date().toISOString(),
                 sourceCount: candidate.evidence.length,
+                retrievalSource: candidate.retrievalSource,
                 provenanceStatus,
                 status: 'new',
                 elementalEntityIds: candidate.elementalEntityIds,

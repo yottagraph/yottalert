@@ -45,6 +45,9 @@
                         ><v-icon icon="mdi-source-branch" size="12" />
                         {{ alert.sourceCount }} sources</span
                     >
+                    <span v-if="alert.retrievalSource" class="chip">
+                        <v-icon icon="mdi-radar" size="12" /> {{ alert.retrievalSource }}
+                    </span>
                     <span class="chip primary"
                         ><v-icon icon="mdi-meter" size="12" /> score {{ alert.score }}</span
                     >

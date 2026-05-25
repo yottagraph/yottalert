@@ -41,8 +41,9 @@ function stopPolling(): void {
 export function useElementalStatus() {
     const overall = computed<'green' | 'amber' | 'red' | 'unknown'>(() => {
         if (!_status.value) return 'unknown';
-        const { apiReachable, mcpReachable } = _status.value;
-        if (apiReachable && mcpReachable) return 'green';
+        const { apiReachable, mcpReachable, galaxyReachable } = _status.value;
+        if (apiReachable && mcpReachable && galaxyReachable) return 'green';
+        if (apiReachable && mcpReachable) return 'amber';
         if (apiReachable || mcpReachable) return 'amber';
         return 'red';
     });
@@ -50,10 +51,11 @@ export function useElementalStatus() {
     const tooltip = computed(() => {
         const s = _status.value;
         if (!s) return 'Checking Elemental connection…';
-        if (s.apiReachable && s.mcpReachable) {
-            return `Elemental healthy · API ${s.latencyMs ?? '—'}ms · ${
-                s.mcpToolCount ?? 0
-            } MCP tools`;
+        if (s.apiReachable && s.mcpReachable && s.galaxyReachable) {
+            return `Elemental healthy · API ${s.latencyMs ?? '—'}ms · Galaxy ${s.galaxyEntityCount ?? 0} entities`;
+        }
+        if (s.apiReachable && s.mcpReachable && !s.galaxyReachable) {
+            return 'Elemental API + MCP healthy · Galaxy unavailable';
         }
         if (s.apiReachable) return 'Elemental API healthy · MCP degraded';
         if (s.mcpReachable) return 'Elemental MCP healthy · API degraded';

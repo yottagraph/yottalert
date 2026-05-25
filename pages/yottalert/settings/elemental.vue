@@ -74,6 +74,12 @@
                             </span>
                         </div>
                         <div class="status-row">
+                            <span class="kicker">Galaxy reachable</span>
+                            <span :class="['value', status?.galaxyReachable ? 'ok' : 'bad']">
+                                {{ status?.galaxyReachable ? 'yes' : 'no' }}
+                            </span>
+                        </div>
+                        <div class="status-row">
                             <span class="kicker">Last checked</span>
                             <span class="value mono">{{
                                 status ? relativeTime(status.lastCheckedAt) : 'never'
@@ -95,6 +101,10 @@
                                 >{{ schema?.flavorCount ?? 0 }} flavors ·
                                 {{ schema?.propertyCount ?? 0 }} PIDs</span
                             >
+                        </div>
+                        <div class="status-row">
+                            <span class="kicker">Galaxy entities</span>
+                            <span class="value mono">{{ status?.galaxyEntityCount ?? '—' }}</span>
                         </div>
                         <div v-if="status?.lastError" class="status-row last-error">
                             <span class="kicker">Last error</span>
@@ -159,6 +169,11 @@
         { name: 'searchEntities', available: status.value?.apiReachable ?? false },
         { name: 'getEntity', available: status.value?.apiReachable ?? false },
         { name: 'searchEvents', available: false },
+        {
+            name: 'getEventsForGeography (galaxy)',
+            available:
+                (status.value?.apiReachable ?? false) && (status.value?.galaxyReachable ?? false),
+        },
         { name: 'getEventsForEntity', available: status.value?.apiReachable ?? false },
         { name: 'getEntitiesForGeography', available: status.value?.apiReachable ?? false },
         { name: 'getRelationships', available: false },
@@ -188,10 +203,13 @@
                 ok: boolean;
                 api: { ok: boolean; error?: string; latencyMs?: number };
                 mcp: { ok: boolean; error?: string; toolCount?: number };
+                galaxy: { ok: boolean; error?: string; numEntities?: number };
             }>('/api/yottalert/elemental/test-connection', { method: 'POST' });
             testMessage.value = res.ok
-                ? `Healthy · API ${res.api.latencyMs ?? '—'}ms · ${res.mcp.toolCount ?? 0} MCP tools`
-                : `Degraded — ${res.api.error || res.mcp.error || 'unknown error'}`;
+                ? `Healthy · API ${res.api.latencyMs ?? '—'}ms · Galaxy ${
+                      res.galaxy.numEntities ?? 0
+                  } entities · ${res.mcp.toolCount ?? 0} MCP tools`
+                : `Degraded — ${res.api.error || res.mcp.error || res.galaxy.error || 'unknown error'}`;
             await refresh();
         } catch (err) {
             testMessage.value = `Test failed: ${err instanceof Error ? err.message : String(err)}`;

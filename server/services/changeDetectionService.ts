@@ -25,6 +25,7 @@ export interface ChangeCandidate {
     relationships: AlertRelationshipRef[];
     evidence: AlertEvidenceRef[];
     confidence: number;
+    retrievalSource: 'galaxy' | 'find';
     recencyMinutes: number;
     elementalEntityIds: string[];
     elementalEventIds: string[];
@@ -79,39 +80,45 @@ async function gatherEventsForArea(
     area: WatchArea,
     entities: AlertEntityRef[],
     apiConfigured: boolean
-): Promise<AlertEventRef[]> {
-    if (!apiConfigured) return [];
+): Promise<{ events: AlertEventRef[]; retrievalSource: 'galaxy' | 'find' | null }> {
+    if (!apiConfigured) return { events: [], retrievalSource: null };
 
     const sinceMs = 30 * 24 * 60 * 60 * 1000;
     const limit = 5;
 
     try {
         const categories = categoriesForInterests(area.interests);
+        const topicLabels = canonicalTopicLabelsForCategories(categories);
         const geoNeid =
             area.geographyNeid && !area.geographyNeid.startsWith('local-')
                 ? area.geographyNeid
                 : entities.find((entity) => !entity.neid.startsWith('local-'))?.neid;
         if (!geoNeid) {
-            return [];
+            return { events: [], retrievalSource: null };
         }
-        const rawEvents = await elementalEventsClient.fetchCategoryAnchoredEvents(
-            canonicalTopicLabelsForCategories(categories),
-            {
-                geoNeid,
-                sinceMs,
-                limit,
-            }
-        );
+        const galaxyEvents = await elementalEventsClient.fetchGalaxyAnchoredEvents(geoNeid, {
+            sinceMs,
+            limit,
+            topicLabels,
+        });
+        const usedSource: 'galaxy' | 'find' = galaxyEvents.length ? 'galaxy' : 'find';
+        const rawEvents = galaxyEvents.length
+            ? galaxyEvents
+            : await elementalEventsClient.fetchCategoryAnchoredEvents(topicLabels, {
+                  geoNeid,
+                  sinceMs,
+                  limit,
+              });
 
         const realEvents = rawEvents.map((event) =>
             elementalEventsClient.toAlertEventRef(event, area.geographyLabel)
         );
-        if (realEvents.length) return realEvents;
+        if (realEvents.length) return { events: realEvents, retrievalSource: usedSource };
     } catch (error) {
         console.warn('[changeDetectionService] gatherEventsForRule failed', error);
     }
 
-    return [];
+    return { events: [], retrievalSource: null };
 }
 
 function makeEvidence(
@@ -176,7 +183,8 @@ export async function detectChanges(
 ): Promise<ChangeCandidate[]> {
     const apiConfigured = elementalApiClient.isConfigured();
     const entities = await gatherEntitiesForArea(area);
-    const events = await gatherEventsForArea(area, entities, apiConfigured);
+    const eventResult = await gatherEventsForArea(area, entities, apiConfigured);
+    const events = eventResult.events;
     if (!events.length) return [];
     const relationships = makeRelationships(area, entities);
     const evidence = makeEvidence(area, entities, events);
@@ -205,6 +213,7 @@ export async function detectChanges(
             relationships,
             evidence,
             confidence: Math.max(0.4, Math.min(0.98, averageEventConfidence)),
+            retrievalSource: eventResult.retrievalSource ?? 'find',
             recencyMinutes: Number.isFinite(recencyMinutes) ? recencyMinutes : 18,
             elementalEntityIds: entities.map((e) => e.neid),
             elementalEventIds,
@@ -227,6 +236,7 @@ export async function detectChanges(
             relationships: relationships.slice(0, 1),
             evidence: evidence.slice(0, 3),
             confidence: Math.max(0.35, Math.min(0.9, averageEventConfidence - 0.08)),
+            retrievalSource: eventResult.retrievalSource ?? 'find',
             recencyMinutes: 240,
             elementalEntityIds: entities.slice(1, 3).map((e) => e.neid),
             elementalEventIds: secondaryEvents

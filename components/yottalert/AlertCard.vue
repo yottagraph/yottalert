@@ -25,6 +25,10 @@
                 <v-icon icon="mdi-source-branch" size="11" />
                 {{ alert.sourceCount }} source{{ alert.sourceCount === 1 ? '' : 's' }}
             </span>
+            <span v-if="alert.retrievalSource" class="chip">
+                <v-icon icon="mdi-radar" size="11" />
+                {{ alert.retrievalSource }}
+            </span>
             <span class="chip">{{ Math.round(alert.confidence * 100) }}% conf</span>
             <span class="time">{{ relativeTime(alert.createdAt) }}</span>
         </div>

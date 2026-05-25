@@ -16,6 +16,21 @@ interface RawPropertyMap {
     [pid: string]: PropertyValueRow[];
 }
 
+interface GalaxyQuad {
+    source?: string;
+    pid?: number;
+    property?: string;
+    destination?: string;
+    dest_type?: string;
+    time?: string;
+}
+
+interface GalaxyEntityInfo {
+    neid?: string;
+    flavor?: string;
+    flavorName?: string;
+}
+
 export interface RawEvent {
     articleNeid: string;
     title: string;
@@ -196,6 +211,20 @@ function compareOccurredAt(a?: string, b?: string): number {
     const ta = a ? Date.parse(a) : 0;
     const tb = b ? Date.parse(b) : 0;
     return tb - ta;
+}
+
+function normalizeToken(value: string): string {
+    return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function normalizeTopic(value: string): string {
+    return value.trim().toLowerCase();
+}
+
+function looksLikeArticleFlavor(flavor: string | undefined): boolean {
+    if (!flavor) return false;
+    const normalized = flavor.toLowerCase();
+    return normalized.includes('article') || normalized.includes('news');
 }
 
 function confidenceFrom(event: RawEvent): number {
@@ -458,9 +487,104 @@ export async function fetchCategoryAnchoredEvents(
     return filtered.slice(0, opts.limit);
 }
 
+async function fetchGalaxyQuads(geoNeid: string): Promise<GalaxyQuad[]> {
+    try {
+        const res = await $fetch<{ quads?: GalaxyQuad[] }>(
+            buildUrl(`galaxy/${encodeURIComponent(geoNeid)}/quads`),
+            {
+                headers: headers(),
+                timeout: 12_000,
+            }
+        );
+        return res.quads ?? [];
+    } catch (error) {
+        console.warn('[elementalEventsClient] galaxy quads fetch failed', error);
+        return [];
+    }
+}
+
+async function fetchGalaxyEntityInfo(neid: string): Promise<GalaxyEntityInfo | null> {
+    try {
+        return await $fetch<GalaxyEntityInfo>(buildUrl(`galaxy/${encodeURIComponent(neid)}/info`), {
+            headers: headers(),
+            timeout: 5_000,
+        });
+    } catch {
+        return null;
+    }
+}
+
+export async function fetchGalaxyAnchoredEvents(
+    geoNeid: string,
+    opts: { sinceMs: number; limit: number; topicLabels?: string[] }
+): Promise<RawEvent[]> {
+    const normalizedGeoNeid = toNeid(geoNeid);
+    if (!normalizedGeoNeid || !elementalApiClient.isConfigured()) return [];
+
+    const schema = await getSchemaIds();
+    const appearsInPid = schema?.pids.appearsIn ? Number(schema.pids.appearsIn) : null;
+    const cutoff = Date.now() - Math.max(opts.sinceMs, 60_000);
+
+    const quads = await fetchGalaxyQuads(normalizedGeoNeid);
+    if (!quads.length) return [];
+
+    const candidatePairs = quads
+        .filter((quad) => {
+            const source = toNeid(quad.source);
+            const destination = toNeid(quad.destination);
+            if (!source || !destination || destination !== normalizedGeoNeid) return false;
+            if (source === normalizedGeoNeid) return false;
+
+            if (appearsInPid !== null && quad.pid !== appearsInPid) return false;
+            if (appearsInPid === null) {
+                const property = normalizeToken(quad.property ?? '');
+                if (!(property.includes('appearsin') || property.includes('locatedin')))
+                    return false;
+            }
+
+            if (!quad.time) return true;
+            const parsed = Date.parse(quad.time);
+            return Number.isFinite(parsed) ? parsed >= cutoff : true;
+        })
+        .map((quad) => ({ source: toNeid(quad.source)!, time: quad.time }));
+
+    if (!candidatePairs.length) return [];
+
+    candidatePairs.sort((a, b) => compareOccurredAt(a.time, b.time));
+    const candidateIds = unique(candidatePairs.map((pair) => pair.source)).slice(
+        0,
+        Math.max(opts.limit * 8, 40)
+    );
+
+    const infoRows = await Promise.all(
+        candidateIds.map(async (neid) => ({
+            neid,
+            info: await fetchGalaxyEntityInfo(neid),
+        }))
+    );
+    const articleIds = infoRows
+        .filter((row) => looksLikeArticleFlavor(row.info?.flavorName ?? row.info?.flavor))
+        .map((row) => row.neid);
+    const idsToHydrate = articleIds.length ? articleIds : candidateIds;
+    if (!idsToHydrate.length) return [];
+
+    const hydrated = await hydrateRawEvents(idsToHydrate);
+    const normalizedTopics = new Set((opts.topicLabels ?? []).map(normalizeTopic));
+    const filteredByTime = hydrated.filter((event) => {
+        if (!event.occurredAt) return true;
+        const parsed = Date.parse(event.occurredAt);
+        return Number.isFinite(parsed) ? parsed >= cutoff : true;
+    });
+    const filteredByTopic = normalizedTopics.size
+        ? filteredByTime.filter((event) => normalizedTopics.has(normalizeTopic(event.type)))
+        : filteredByTime;
+    return filteredByTopic.slice(0, opts.limit);
+}
+
 export const elementalEventsClient = {
     fetchEntityAnchoredEvents,
     fetchCategoryAnchoredEvents,
+    fetchGalaxyAnchoredEvents,
     enrichEvent,
     toAlertEventRef,
 };

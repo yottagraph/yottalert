@@ -93,6 +93,29 @@ export async function pingQueryServer(): Promise<{
     }
 }
 
+export async function pingGalaxy(): Promise<{
+    ok: boolean;
+    latencyMs?: number;
+    numEntities?: number;
+    error?: string;
+}> {
+    if (!isConfigured()) return { ok: false, error: 'Gateway not configured' };
+    const t0 = Date.now();
+    try {
+        const res = await $fetch<{ num_entities?: number }>(buildUrl('galaxy/stats'), {
+            headers: headers(),
+            timeout: 5000,
+        });
+        return {
+            ok: typeof res?.num_entities === 'number' && res.num_entities >= 0,
+            latencyMs: Date.now() - t0,
+            numEntities: res?.num_entities,
+        };
+    } catch (err) {
+        return { ok: false, latencyMs: Date.now() - t0, error: errorMessage(err) };
+    }
+}
+
 export async function searchEntitiesByName(
     query: string,
     options?: { maxResults?: number; flavors?: string[] }
@@ -213,6 +236,7 @@ function errorMessage(err: unknown): string {
 export const elementalApiClient = {
     isConfigured,
     pingQueryServer,
+    pingGalaxy,
     searchEntitiesByName,
     getEntityNameByNeid,
     fetchRecentChanges,
