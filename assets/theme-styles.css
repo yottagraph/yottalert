@@ -273,5 +273,99 @@
 }
 
 .v-field__input {
-    color: white;
+    color: var(--theme-text, white);
+}
+
+/* ===================================
+   Yottalert Contrast Contract
+   =================================== */
+.theme-brand .yottalert-shell,
+.theme-brand .onboarding {
+    --yottalert-bg: var(--theme-background, var(--lv-black));
+    --yottalert-surface: var(--theme-surface, var(--lv-surface));
+    --yottalert-card-bg: var(--theme-card-background, var(--lv-surface-light));
+    --yottalert-panel-bg: var(--theme-panel-background, #111111);
+    --yottalert-text: var(--theme-text, var(--lv-white));
+    --yottalert-text-secondary: var(--theme-text-secondary, #a0aec0);
+    --yottalert-text-muted: var(--theme-text-muted, #8f8f8f);
+    --yottalert-border: var(--theme-border, #2a2a2a);
+    --yottalert-hover: var(--theme-hover, var(--lv-surface-light));
+    --yottalert-primary: var(--theme-primary, var(--lv-green));
+    --yottalert-primary-rgb: var(--dynamic-primary-rgb, 63, 234, 0);
+
+    background: var(--yottalert-bg) !important;
+    color: var(--yottalert-text) !important;
+}
+
+.theme-brand .yottalert-scroll,
+.theme-brand .onboarding {
+    background: var(--yottalert-bg) !important;
+    color: var(--yottalert-text) !important;
+}
+
+.theme-brand .yottalert-shell :where(.alert-card, .empty-card, .status-strip .chip),
+.theme-brand .onboarding .card {
+    background: var(--yottalert-surface) !important;
+    border-color: var(--yottalert-border) !important;
+    color: var(--yottalert-text) !important;
+}
+
+.theme-brand .yottalert-shell :where(.alert-card:hover) {
+    background: var(--yottalert-card-bg) !important;
+}
+
+.theme-brand
+    :where(
+        .yottalert-shell,
+        .onboarding
+    )
+    :where(.page-title, .section-title, .title, h1, h2, h3, .value, .watch-name) {
+    color: var(--yottalert-text) !important;
+}
+
+.theme-brand
+    :where(
+        .yottalert-shell,
+        .onboarding
+    )
+    :where(
+        .page-subtitle,
+        .summary,
+        .empty-text,
+        .subtitle,
+        .interest-title,
+        .geo,
+        .why,
+        .chip,
+        .footer-text,
+        .footer-line,
+        .muted
+    ) {
+    color: var(--yottalert-text-secondary) !important;
+}
+
+.theme-brand
+    :where(
+        .yottalert-shell,
+        .onboarding
+    )
+    :where(.time, .kicker, .section-label, .footer-line.muted) {
+    color: var(--yottalert-text-muted) !important;
+}
+
+.theme-brand :where(.yottalert-shell, .onboarding) :where(.change-link, .text-green) {
+    color: var(--yottalert-primary) !important;
+}
+
+.theme-brand .onboarding .interest-chip,
+.theme-brand .yottalert-shell .alert-card .chip {
+    background: rgba(var(--yottalert-primary-rgb), 0.08) !important;
+    border-color: var(--yottalert-border) !important;
+    color: var(--yottalert-text-secondary) !important;
+}
+
+.theme-brand .onboarding .interest-chip.selected {
+    background: rgba(var(--yottalert-primary-rgb), 0.16) !important;
+    border-color: rgba(var(--yottalert-primary-rgb), 0.55) !important;
+    color: var(--yottalert-primary) !important;
 }

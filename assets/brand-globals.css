@@ -52,6 +52,21 @@
     --dynamic-severity-suppressed-rgb: 153, 153, 153;
 
     /* Yottalert primary RGB (cyber green for tinted overlays) */
+    --dynamic-primary: var(--lv-green);
+    --dynamic-secondary: var(--lv-blue);
+    --dynamic-accent: var(--lv-blue);
+    --dynamic-background: var(--lv-black);
+    --dynamic-surface: var(--lv-surface);
+    --dynamic-card-background: var(--lv-surface-light);
+    --dynamic-panel-background: #111111;
+    --dynamic-text-primary: var(--lv-white);
+    --dynamic-text-secondary: #a0aec0;
+    --dynamic-text-muted: #8f8f8f;
+    --dynamic-hover: var(--lv-surface-light);
+    --dynamic-border: #2a2a2a;
+    --dynamic-success: var(--lv-green);
+    --dynamic-warning: var(--lv-yellow);
+    --dynamic-error: #ef4444;
     --dynamic-primary-rgb: 63, 234, 0;
     --dynamic-fg-rgb: 229, 229, 229;
 }

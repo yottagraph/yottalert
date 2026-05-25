@@ -2,7 +2,9 @@
     <main class="onboarding">
         <section class="card">
             <span class="kicker">YOTTALERT</span>
-            <h1 class="title">Start with one place</h1>
+            <h1 class="title">
+                {{ existingWatchArea ? 'Change your watch area' : 'Start with one place' }}
+            </h1>
             <p class="subtitle">
                 Pick a ZIP code or county, then choose a few things you care about.
             </p>
@@ -47,7 +49,7 @@
                     prepend-icon="mdi-radar"
                     @click="startWatching"
                 >
-                    Start watching
+                    {{ existingWatchArea ? 'Update watch area' : 'Start watching' }}
                 </v-btn>
             </div>
         </section>
@@ -70,6 +72,7 @@
     const searching = ref(false);
     const saving = ref(false);
     const errorMessage = ref('');
+    const existingWatchArea = ref<WatchArea | null>(null);
 
     let searchTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -87,8 +90,16 @@
 
     onMounted(async () => {
         try {
-            await $fetch<{ watchArea: WatchArea }>('/api/yottalert/watch-area');
-            router.replace('/yottalert');
+            const res = await $fetch<{ watchArea: WatchArea }>('/api/yottalert/watch-area');
+            existingWatchArea.value = res.watchArea;
+            selectedGeography.value = {
+                neid: res.watchArea.geographyNeid,
+                name: res.watchArea.geographyLabel,
+                geographyType: res.watchArea.geographyType,
+                code: res.watchArea.geographyCode,
+            };
+            geographySuggestions.value = [selectedGeography.value];
+            selectedInterests.value = [...res.watchArea.interests];
         } catch {
             // Stay on onboarding if no watch area exists yet.
         }

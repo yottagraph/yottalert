@@ -31,6 +31,10 @@ interface GalaxyEntityInfo {
     flavorName?: string;
 }
 
+interface GalaxyNeighborsResponse {
+    neighbors?: string[];
+}
+
 export interface RawEvent {
     articleNeid: string;
     title: string;
@@ -503,6 +507,22 @@ async function fetchGalaxyQuads(geoNeid: string): Promise<GalaxyQuad[]> {
     }
 }
 
+async function fetchGalaxyNeighbors(geoNeid: string, size: number): Promise<string[]> {
+    try {
+        const res = await $fetch<GalaxyNeighborsResponse>(
+            buildUrl(`galaxy/${encodeURIComponent(geoNeid)}/neighbors?size=${size}`),
+            {
+                headers: headers(),
+                timeout: 12_000,
+            }
+        );
+        return unique((res.neighbors ?? []).map((id) => toNeid(id) ?? ''));
+    } catch (error) {
+        console.warn('[elementalEventsClient] galaxy neighbors fetch failed', error);
+        return [];
+    }
+}
+
 async function fetchGalaxyEntityInfo(neid: string): Promise<GalaxyEntityInfo | null> {
     try {
         return await $fetch<GalaxyEntityInfo>(buildUrl(`galaxy/${encodeURIComponent(neid)}/info`), {
@@ -521,43 +541,43 @@ export async function fetchGalaxyAnchoredEvents(
     const normalizedGeoNeid = toNeid(geoNeid);
     if (!normalizedGeoNeid || !elementalApiClient.isConfigured()) return [];
 
-    const schema = await getSchemaIds();
-    const appearsInPid = schema?.pids.appearsIn ? Number(schema.pids.appearsIn) : null;
     const cutoff = Date.now() - Math.max(opts.sinceMs, 60_000);
 
-    const quads = await fetchGalaxyQuads(normalizedGeoNeid);
-    if (!quads.length) return [];
-
-    const candidatePairs = quads
-        .filter((quad) => {
-            const source = toNeid(quad.source);
-            const destination = toNeid(quad.destination);
-            if (!source || !destination || destination !== normalizedGeoNeid) return false;
-            if (source === normalizedGeoNeid) return false;
-
-            if (appearsInPid !== null && quad.pid !== appearsInPid) return false;
-            if (appearsInPid === null) {
-                const property = normalizeToken(quad.property ?? '');
-                if (!(property.includes('appearsin') || property.includes('locatedin')))
-                    return false;
-            }
-
-            if (!quad.time) return true;
-            const parsed = Date.parse(quad.time);
-            return Number.isFinite(parsed) ? parsed >= cutoff : true;
-        })
-        .map((quad) => ({ source: toNeid(quad.source)!, time: quad.time }));
-
-    if (!candidatePairs.length) return [];
-
-    candidatePairs.sort((a, b) => compareOccurredAt(a.time, b.time));
-    const candidateIds = unique(candidatePairs.map((pair) => pair.source)).slice(
-        0,
-        Math.max(opts.limit * 8, 40)
+    // Prefer the dedicated neighborhood API for geo-centric traversal.
+    let candidateIds = await fetchGalaxyNeighbors(
+        normalizedGeoNeid,
+        Math.max(opts.limit * 24, 120)
     );
+    candidateIds = candidateIds.filter((id) => id !== normalizedGeoNeid);
+
+    // Fallback: derive candidates from quads when neighborhood retrieval is unavailable.
+    if (!candidateIds.length) {
+        const quads = await fetchGalaxyQuads(normalizedGeoNeid);
+        const quadCandidates = quads
+            .filter((quad) => {
+                const source = toNeid(quad.source);
+                const destination = toNeid(quad.destination);
+                if (!source || !destination) return false;
+                if (source !== normalizedGeoNeid && destination !== normalizedGeoNeid) return false;
+                if (source === destination) return false;
+
+                if (!quad.time) return true;
+                const parsed = Date.parse(quad.time);
+                return Number.isFinite(parsed) ? parsed >= cutoff : true;
+            })
+            .map((quad) => {
+                const source = toNeid(quad.source);
+                const destination = toNeid(quad.destination);
+                if (source === normalizedGeoNeid) return destination;
+                return source;
+            })
+            .filter((id): id is string => Boolean(id));
+        candidateIds = unique(quadCandidates).filter((id) => id !== normalizedGeoNeid);
+    }
+    if (!candidateIds.length) return [];
 
     const infoRows = await Promise.all(
-        candidateIds.map(async (neid) => ({
+        candidateIds.slice(0, Math.max(opts.limit * 16, 80)).map(async (neid) => ({
             neid,
             info: await fetchGalaxyEntityInfo(neid),
         }))

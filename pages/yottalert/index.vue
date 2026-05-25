@@ -45,7 +45,7 @@
                         class="mt-3"
                         prepend-icon="mdi-map-marker-radius-outline"
                     >
-                        Set your watch area
+                        {{ watchArea ? 'Change your watch area' : 'Set your watch area' }}
                     </v-btn>
                 </div>
             </section>

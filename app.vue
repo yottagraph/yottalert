@@ -29,6 +29,7 @@
     import { state } from './utils/appState';
 
     const route = useRoute();
+    useLovelaceTheme();
     const { userName } = useUserState();
 
     const noFrameworkRoutes = ['/login', '/a0callback', '/logout', '/pending'];
