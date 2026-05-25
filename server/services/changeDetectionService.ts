@@ -1,13 +1,10 @@
 /**
- * Change detection for a single user watch area. Uses real Elemental article
- * events when available and falls back to synthetic placeholders when not.
+ * Change detection for a single user watch area.
+ * Alerts are generated only from real Elemental events.
  */
 
 import { categoriesForInterests } from '~/utils/yottalert/interests';
-import {
-    canonicalTopicLabelsForCategories,
-    canonicalTopicLabelForCategory,
-} from '~/utils/yottalert/eventCategories';
+import { canonicalTopicLabelsForCategories } from '~/utils/yottalert/eventCategories';
 import type {
     AlertEntityRef,
     AlertEvidenceRef,
@@ -46,10 +43,6 @@ function nowIso(): string {
     return new Date().toISOString();
 }
 
-function nowMinusMinutes(min: number): string {
-    return new Date(Date.now() - min * 60_000).toISOString();
-}
-
 async function gatherEntitiesForArea(area: WatchArea): Promise<AlertEntityRef[]> {
     const out: AlertEntityRef[] = [];
     const seen = new Set<string>();
@@ -82,45 +75,25 @@ async function gatherEntitiesForArea(area: WatchArea): Promise<AlertEntityRef[]>
     return out;
 }
 
-function makeSyntheticEvents(area: WatchArea, entities: AlertEntityRef[]): AlertEventRef[] {
-    const categories = categoriesForInterests(area.interests);
-    const cat = categories[0] ?? 'local_news';
-    const canonical = canonicalTopicLabelForCategory(cat);
-    const labels = [
-        {
-            offset: 18,
-            title: `${canonical} reported${entities[0] ? ` near ${entities[0].name}` : ''}`,
-        },
-        {
-            offset: 96,
-            title: `Earlier ${canonical} flagged in watched ${area.geographyLabel}`,
-        },
-    ];
-    return labels.map((l, i) => ({
-        id: `${area.id}-evt-${i}`,
-        title: l.title,
-        type: canonical,
-        geography: area.geographyLabel,
-        occurredAt: nowMinusMinutes(l.offset),
-        confidence: 0.5,
-        source: 'synthetic',
-        status: 'historical',
-    }));
-}
-
 async function gatherEventsForArea(
     area: WatchArea,
     entities: AlertEntityRef[],
     apiConfigured: boolean
 ): Promise<AlertEventRef[]> {
-    if (!apiConfigured) return makeSyntheticEvents(area, entities);
+    if (!apiConfigured) return [];
 
     const sinceMs = 30 * 24 * 60 * 60 * 1000;
     const limit = 5;
 
     try {
         const categories = categoriesForInterests(area.interests);
-        const geoNeid = area.geographyNeid ?? entities[0]?.neid;
+        const geoNeid =
+            area.geographyNeid && !area.geographyNeid.startsWith('local-')
+                ? area.geographyNeid
+                : entities.find((entity) => !entity.neid.startsWith('local-'))?.neid;
+        if (!geoNeid) {
+            return [];
+        }
         const rawEvents = await elementalEventsClient.fetchCategoryAnchoredEvents(
             canonicalTopicLabelsForCategories(categories),
             {
@@ -138,26 +111,14 @@ async function gatherEventsForArea(
         console.warn('[changeDetectionService] gatherEventsForRule failed', error);
     }
 
-    return makeSyntheticEvents(area, entities);
+    return [];
 }
 
 function makeEvidence(
     area: WatchArea,
     entities: AlertEntityRef[],
-    events: AlertEventRef[],
-    apiConfigured: boolean
+    events: AlertEventRef[]
 ): AlertEvidenceRef[] {
-    if (!apiConfigured || events.every((event) => event.source === 'synthetic')) {
-        return [
-            {
-                id: `${area.id}-syn-1`,
-                evidenceType: 'synthetic',
-                displayText: `Synthetic preview — Elemental is not reachable, so this candidate is illustrative only.`,
-                sourceName: 'Yottalert local generator',
-                confidence: 0.5,
-            },
-        ];
-    }
     const evidence: AlertEvidenceRef[] = entities.slice(0, 3).map((e, i) => ({
         id: `${area.id}-${e.neid}-${i}`,
         elementalObjectId: e.neid,
@@ -216,8 +177,9 @@ export async function detectChanges(
     const apiConfigured = elementalApiClient.isConfigured();
     const entities = await gatherEntitiesForArea(area);
     const events = await gatherEventsForArea(area, entities, apiConfigured);
+    if (!events.length) return [];
     const relationships = makeRelationships(area, entities);
-    const evidence = makeEvidence(area, entities, events, apiConfigured);
+    const evidence = makeEvidence(area, entities, events);
     const recencyMinutes = Math.min(
         ...events
             .map((event) =>
@@ -229,6 +191,10 @@ export async function detectChanges(
     const elementalEventIds = events
         .filter((event) => event.source === 'elemental')
         .map((event) => event.id);
+    if (!elementalEventIds.length) return [];
+
+    const averageEventConfidence =
+        events.reduce((sum, event) => sum + event.confidence, 0) / Math.max(events.length, 1);
 
     const candidates: ChangeCandidate[] = [
         {
@@ -238,7 +204,7 @@ export async function detectChanges(
             events,
             relationships,
             evidence,
-            confidence: apiConfigured ? 0.78 : 0.5,
+            confidence: Math.max(0.4, Math.min(0.98, averageEventConfidence)),
             recencyMinutes: Number.isFinite(recencyMinutes) ? recencyMinutes : 18,
             elementalEntityIds: entities.map((e) => e.neid),
             elementalEventIds,
@@ -260,7 +226,7 @@ export async function detectChanges(
             events: secondaryEvents,
             relationships: relationships.slice(0, 1),
             evidence: evidence.slice(0, 3),
-            confidence: apiConfigured ? 0.66 : 0.45,
+            confidence: Math.max(0.35, Math.min(0.9, averageEventConfidence - 0.08)),
             recencyMinutes: 240,
             elementalEntityIds: entities.slice(1, 3).map((e) => e.neid),
             elementalEventIds: secondaryEvents

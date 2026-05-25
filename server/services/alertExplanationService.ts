@@ -40,6 +40,19 @@ function joinNames(items: { name: string }[], max = 3): string {
     return names.join(', ');
 }
 
+function formatEventMoment(value?: string): string {
+    if (!value) return '';
+    const parsed = Date.parse(value);
+    if (!Number.isFinite(parsed)) return value;
+    return new Date(parsed).toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+    });
+}
+
 export function composeExplanation(inputs: ExplainInputs): Explanation {
     const {
         watchArea,
@@ -61,6 +74,9 @@ export function composeExplanation(inputs: ExplainInputs): Explanation {
         : '';
 
     const where = geographyLabel ? ` in ${geographyLabel}` : '';
+    const leadEvent = events[0];
+    const leadPublication = leadEvent?.publication?.name;
+    const leadOccurredAt = formatEventMoment(leadEvent?.occurredAt);
     const title = events[0]?.title
         ? `${events[0].title}${where}`
         : `New ${severity}-severity change for ${focus}`;
@@ -70,7 +86,10 @@ export function composeExplanation(inputs: ExplainInputs): Explanation {
     if (relLabel) summaryBits.push(relLabel);
     summaryBits.push(`${sourceCount || 0} source${sourceCount === 1 ? '' : 's'} attached`);
 
-    const summary = `Elemental detected ${summaryBits.join(' · ')}${where} matching your active watch area. Confidence ${Math.round(confidence * 100)}%.`;
+    const leadDetail = leadEvent
+        ? `Latest event: "${leadEvent.title}"${leadPublication ? ` (${leadPublication})` : ''}${leadOccurredAt ? ` at ${leadOccurredAt}` : ''}.`
+        : '';
+    const summary = `Elemental detected ${summaryBits.join(' · ')}${where}. ${leadDetail} Confidence ${Math.round(confidence * 100)}%.`;
 
     const why = describeWhy(watchArea, severity, geographyLabel, entities);
 
