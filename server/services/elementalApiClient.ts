@@ -9,6 +9,8 @@
 
 import { useRuntimeConfig } from '#imports';
 
+import { elementalFetch } from '~/server/utils/elementalFetch';
+
 interface SearchHit {
     neid: string;
     name: string;
@@ -78,7 +80,7 @@ export async function pingQueryServer(): Promise<{
     const t0 = Date.now();
     try {
         const url = buildUrl('elemental/metadata/schema');
-        const res = await $fetch<{ schema?: { flavors?: unknown[] } }>(url, {
+        const res = await elementalFetch<{ schema?: { flavors?: unknown[] } }>(url, {
             headers: headers(),
             timeout: 5000,
         });
@@ -102,7 +104,7 @@ export async function pingGalaxy(): Promise<{
     if (!isConfigured()) return { ok: false, error: 'Gateway not configured' };
     const t0 = Date.now();
     try {
-        const res = await $fetch<{ num_entities?: number }>(buildUrl('galaxy/stats'), {
+        const res = await elementalFetch<{ num_entities?: number }>(buildUrl('galaxy/stats'), {
             headers: headers(),
             timeout: 5000,
         });
@@ -122,7 +124,7 @@ export async function searchEntitiesByName(
 ): Promise<SearchHit[]> {
     if (!isConfigured() || !query.trim()) return [];
     try {
-        const res = await $fetch<{ results?: Array<{ matches?: SearchHit[] }> }>(
+        const res = await elementalFetch<{ results?: Array<{ matches?: SearchHit[] }> }>(
             buildUrl('entities/search'),
             {
                 method: 'POST',
@@ -151,7 +153,7 @@ export async function searchEntitiesByName(
 export async function getEntityNameByNeid(neid: string): Promise<string | null> {
     if (!isConfigured() || !neid) return null;
     try {
-        const res = await $fetch<{ name?: string }>(buildUrl(`entities/${neid}/name`), {
+        const res = await elementalFetch<{ name?: string }>(buildUrl(`entities/${neid}/name`), {
             headers: headers(),
             timeout: 5000,
         });
@@ -170,7 +172,7 @@ export async function fetchRecentChanges(neids: string[], limit = 5): Promise<Re
     const out: RecentChange[] = [];
     for (const neid of neids.slice(0, 8)) {
         try {
-            const res = await $fetch<{
+            const res = await elementalFetch<{
                 events?: Array<{ id?: string; title?: string; date?: string }>;
             }>(buildUrl(`entities/${neid}/events`), {
                 headers: headers(),
@@ -198,7 +200,7 @@ export async function getSchemaSummary(): Promise<{
 }> {
     if (!isConfigured()) return { flavorCount: 0, propertyCount: 0 };
     try {
-        const res = await $fetch<{
+        const res = await elementalFetch<{
             schema?: { flavors?: unknown[]; properties?: unknown[] };
         }>(buildUrl('elemental/metadata/schema'), {
             headers: headers(),
@@ -216,7 +218,7 @@ export async function getSchemaSummary(): Promise<{
 export async function fetchProvenance(objectId: string): Promise<ProvenanceFetch | null> {
     if (!isConfigured() || !objectId) return null;
     try {
-        return await $fetch<ProvenanceFetch>(
+        return await elementalFetch<ProvenanceFetch>(
             buildUrl(`provenance/${encodeURIComponent(objectId)}`),
             {
                 headers: headers(),

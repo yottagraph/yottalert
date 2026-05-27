@@ -1,11 +1,15 @@
 import { useRuntimeConfig } from '#imports';
 
 import type { AlertEventRef } from '~/utils/yottalert/types';
+import { elementalFetch } from '~/server/utils/elementalFetch';
 import { elementalApiClient } from './elementalApiClient';
 import { getSchemaIds } from './elementalSchemaCache';
 
 interface PropertyValueRow {
     eid?: string;
+    // `pid` may arrive as a string (large int64 preserved by `elementalFetch`)
+    // or as a JS number (small ids that fit in 53 bits). Always coerce via
+    // `String(...)` before using as a key or interpolating into a payload.
     pid?: number | string;
     value?: unknown;
     recorded_at?: string;
@@ -18,7 +22,8 @@ interface RawPropertyMap {
 
 interface GalaxyQuad {
     source?: string;
-    pid?: number;
+    // `pid` may be a string (bigint preserved by `elementalFetch`) or a number.
+    pid?: number | string;
     property?: string;
     destination?: string;
     dest_type?: string;
@@ -115,7 +120,7 @@ async function postFind(expression: string, limit: number): Promise<string[]> {
         body.set('expression', expression);
         body.set('limit', String(limit));
 
-        const res = await $fetch<Record<string, unknown>>(buildUrl('elemental/find'), {
+        const res = await elementalFetch<Record<string, unknown>>(buildUrl('elemental/find'), {
             method: 'POST',
             headers: headers({ 'Content-Type': 'application/x-www-form-urlencoded' }),
             body: body.toString(),
@@ -149,12 +154,15 @@ async function getNames(neids: string[]): Promise<Record<string, string>> {
     const ids = unique(neids);
     if (!ids.length) return {};
     try {
-        const res = await $fetch<{ results?: Record<string, string> }>(buildUrl('entities/names'), {
-            method: 'POST',
-            headers: headers(),
-            body: { neids: ids },
-            timeout: 8000,
-        });
+        const res = await elementalFetch<{ results?: Record<string, string> }>(
+            buildUrl('entities/names'),
+            {
+                method: 'POST',
+                headers: headers(),
+                body: { neids: ids },
+                timeout: 8000,
+            }
+        );
         return res.results ?? {};
     } catch {
         return {};
@@ -176,7 +184,7 @@ async function getPropertyValuesFor(
     if (includeAttributes) body.set('include_attributes', 'true');
 
     try {
-        const res = await $fetch<{ values?: PropertyValueRow[] }>(
+        const res = await elementalFetch<{ values?: PropertyValueRow[] }>(
             buildUrl('elemental/entities/properties'),
             {
                 method: 'POST',
@@ -493,7 +501,7 @@ export async function fetchCategoryAnchoredEvents(
 
 async function fetchGalaxyQuads(geoNeid: string): Promise<GalaxyQuad[]> {
     try {
-        const res = await $fetch<{ quads?: GalaxyQuad[] }>(
+        const res = await elementalFetch<{ quads?: GalaxyQuad[] }>(
             buildUrl(`galaxy/${encodeURIComponent(geoNeid)}/quads`),
             {
                 headers: headers(),
@@ -509,7 +517,7 @@ async function fetchGalaxyQuads(geoNeid: string): Promise<GalaxyQuad[]> {
 
 async function fetchGalaxyNeighbors(geoNeid: string, size: number): Promise<string[]> {
     try {
-        const res = await $fetch<GalaxyNeighborsResponse>(
+        const res = await elementalFetch<GalaxyNeighborsResponse>(
             buildUrl(`galaxy/${encodeURIComponent(geoNeid)}/neighbors?size=${size}`),
             {
                 headers: headers(),
@@ -525,10 +533,13 @@ async function fetchGalaxyNeighbors(geoNeid: string, size: number): Promise<stri
 
 async function fetchGalaxyEntityInfo(neid: string): Promise<GalaxyEntityInfo | null> {
     try {
-        return await $fetch<GalaxyEntityInfo>(buildUrl(`galaxy/${encodeURIComponent(neid)}/info`), {
-            headers: headers(),
-            timeout: 5_000,
-        });
+        return await elementalFetch<GalaxyEntityInfo>(
+            buildUrl(`galaxy/${encodeURIComponent(neid)}/info`),
+            {
+                headers: headers(),
+                timeout: 5_000,
+            }
+        );
     } catch {
         return null;
     }

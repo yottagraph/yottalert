@@ -1,5 +1,8 @@
 import { useRuntimeConfig } from '#imports';
 
+import { toIdString } from '~/utils/elementalJsonSafe';
+import { elementalFetch } from '~/server/utils/elementalFetch';
+
 export interface SchemaIds {
     fetchedAt: string;
     fids: {
@@ -59,17 +62,19 @@ function schemaHeaders(): Record<string, string> {
 
 function idFrom(item: Record<string, unknown> | null | undefined): string | null {
     if (!item) return null;
-    const value =
-        item.fid ??
-        item.findex ??
-        item.pid ??
-        item.pindex ??
-        item.aid ??
-        item.aindex ??
-        item.id ??
-        null;
-    if (value === null || value === undefined) return null;
-    return String(value);
+    // NOTE: schema responses must be parsed with `elementalFetch` so that
+    // 64-bit PIDs/FIDs/AIDs arrive as strings; otherwise `JSON.parse`
+    // silently rounds them past 2^53 and every downstream `entities/properties`
+    // / `find` call sends a corrupted ID to Elemental.
+    return (
+        toIdString(item.fid) ??
+        toIdString(item.findex) ??
+        toIdString(item.pid) ??
+        toIdString(item.pindex) ??
+        toIdString(item.aid) ??
+        toIdString(item.aindex) ??
+        toIdString(item.id)
+    );
 }
 
 function normalizeName(value: unknown): string {
@@ -101,7 +106,7 @@ async function loadSchemaIds(): Promise<SchemaIds | null> {
     if (!url) return null;
 
     try {
-        const response = await $fetch<Record<string, unknown>>(url, {
+        const response = await elementalFetch<Record<string, unknown>>(url, {
             headers: schemaHeaders(),
             timeout: 8000,
         });

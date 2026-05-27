@@ -1,6 +1,7 @@
 import { defineNuxtPlugin } from '#app';
 import { configureElementalClient } from '@yottagraph-app/elemental-api/config';
 import { useUserState } from '~/composables/useUserState';
+import { parseElementalJson } from '~/utils/elementalJsonSafe';
 import { formatUrl } from '~/utils/formatUrl';
 
 export default defineNuxtPlugin(() => {
@@ -46,7 +47,11 @@ export default defineNuxtPlugin(() => {
             } else {
                 const contentType = response.headers.get('content-type');
                 if (contentType?.includes('application/json')) {
-                    data = await response.json();
+                    // Use a bigint-safe parser so 64-bit Elemental IDs (PIDs,
+                    // FIDs, AIDs) don't get silently rounded by JSON.parse
+                    // and corrupt downstream entities/properties calls.
+                    const text = await response.text();
+                    data = parseElementalJson(text);
                 } else if (contentType?.includes('text/')) {
                     data = await response.text();
                 } else {

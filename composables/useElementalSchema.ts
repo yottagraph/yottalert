@@ -15,15 +15,23 @@
 
 import { useElementalClient } from '@yottagraph-app/elemental-api/client';
 
+import { toIdString } from '~/utils/elementalJsonSafe';
+
+// Elemental IDs are 64-bit ints on the wire. Small ids fit in a JS `number`,
+// but large ids must travel as strings to avoid `JSON.parse` rounding past
+// 2^53. We expose both shapes here; consumers should normalize with
+// `String(fid)` before interpolating into URLs or JSON expressions.
+export type ElementalId = string | number;
+
 export interface SchemaFlavor {
     name: string;
-    fid: number;
+    fid: ElementalId;
     [key: string]: any;
 }
 
 export interface SchemaProperty {
     name: string;
-    pid: number;
+    pid: ElementalId;
     type?: string;
     [key: string]: any;
 }
@@ -40,12 +48,12 @@ function normalizeSchema(res: any): { flavors: SchemaFlavor[]; properties: Schem
 
     const flavors = rawFlavors.map((f: any) => ({
         ...f,
-        fid: f.fid ?? f.findex,
+        fid: toIdString(f.fid ?? f.findex) ?? f.fid ?? f.findex,
     }));
 
     const properties = rawProps.map((p: any) => ({
         ...p,
-        pid: p.pid ?? p.pindex,
+        pid: toIdString(p.pid ?? p.pindex) ?? p.pid ?? p.pindex,
     }));
 
     return { flavors, properties };
@@ -79,23 +87,25 @@ export function useElementalSchema() {
         return fetchPromise;
     }
 
-    function flavorByName(name: string): number | null {
+    function flavorByName(name: string): ElementalId | null {
         const f = _flavors.value.find((fl) => fl.name === name);
         return f?.fid ?? null;
     }
 
-    function pidByName(name: string): number | null {
+    function pidByName(name: string): ElementalId | null {
         const p = _properties.value.find((pr) => pr.name === name);
         return p?.pid ?? null;
     }
 
-    function flavorName(fid: number): string | null {
-        const f = _flavors.value.find((fl) => fl.fid === fid);
+    function flavorName(fid: ElementalId): string | null {
+        const target = String(fid);
+        const f = _flavors.value.find((fl) => String(fl.fid) === target);
         return f?.name ?? null;
     }
 
-    function propertyName(pid: number): string | null {
-        const p = _properties.value.find((pr) => pr.pid === pid);
+    function propertyName(pid: ElementalId): string | null {
+        const target = String(pid);
+        const p = _properties.value.find((pr) => String(pr.pid) === target);
         return p?.name ?? null;
     }
 
@@ -103,7 +113,10 @@ export function useElementalSchema() {
         return _properties.value.filter((p) => {
             const domains: any[] = p.domains ?? p.domain ?? [];
             const fid = flavorByName(typeName);
-            return !domains.length || (fid !== null && domains.includes(fid));
+            if (!domains.length) return true;
+            if (fid === null) return false;
+            const target = String(fid);
+            return domains.some((d) => String(d) === target);
         });
     }
 
